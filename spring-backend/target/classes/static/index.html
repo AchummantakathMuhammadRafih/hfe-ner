@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800">
-    <div class="max-w-6xl mx-auto py-8 px-4">
+    <div class="max-w-7xl mx-auto py-8 px-4">
         <!-- Header -->
         <header class="mb-6 flex items-center justify-between border-b pb-5 border-slate-200">
             <div>
@@ -17,7 +17,7 @@
                     Docling KG Builder with GLiNER
                 </h1>
                 <p class="text-xs text-slate-600 mt-1">
-                    Joint Zero-Shot Entity & Relation Extraction using <span class="font-mono bg-slate-200 px-1.5 py-0.5 rounded text-xs text-indigo-800">knowledgator/gliner-relex-large-v1.0</span> (Strictly 1 File at a Time)
+                    Persistent SQLite Queue Engine &bull; Up to 10 Active Files Concurrently &bull; Fail-Fast Strict Validation
                 </p>
             </div>
             <div id="serviceStatus" class="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
@@ -30,7 +30,7 @@
         <div class="flex border-b border-slate-200 mb-6 gap-3">
             <button id="tabBatchBtn" class="px-5 py-2.5 font-semibold text-sm border-b-2 border-indigo-600 text-indigo-600 flex items-center gap-2">
                 <i class="fa-solid fa-folder-tree"></i>
-                Batch Recursive Directory Mode
+                Batch Queue & Persistent Database Mode
             </button>
             <button id="tabSingleBtn" class="px-5 py-2.5 font-medium text-sm text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center gap-2">
                 <i class="fa-solid fa-file-arrow-up"></i>
@@ -43,7 +43,7 @@
             <button id="toggleSettings" class="w-full text-xs font-semibold text-slate-700 flex items-center justify-between hover:text-indigo-600">
                 <span class="flex items-center gap-2">
                     <i class="fa-solid fa-sliders text-indigo-600"></i>
-                    Global Extraction Schema & Thresholds (Applied to both modes)
+                    Global Extraction Schema & Thresholds (Applied to all jobs)
                 </span>
                 <i id="settingsChevron" class="fa-solid fa-chevron-down text-xs transition-transform"></i>
             </button>
@@ -68,12 +68,16 @@
             </div>
         </div>
 
-        <!-- TAB 1: BATCH RECURSIVE DIRECTORY MODE -->
+        <!-- TAB 1: BATCH QUEUE & PERSISTENT SQLITE MODE -->
         <div id="batchTabSection">
+            <!-- Directory Config & Global Controls -->
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-                <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <i class="fa-solid fa-gears text-indigo-600"></i>
-                    Recursive Directory Configuration
+                <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center justify-between">
+                    <span class="flex items-center gap-2">
+                        <i class="fa-solid fa-gears text-indigo-600"></i>
+                        Batch Queue Directory Configuration
+                    </span>
+                    <span class="text-xs text-slate-400 font-normal">State saved persistently in SQLite (survives crashes)</span>
                 </h2>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -82,95 +86,104 @@
                         <input id="inputRoot" type="text" placeholder="e.g. C:\data\fda_guidance_raw" class="w-full text-sm font-mono border rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-400 outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Output Root Directory (replicates same directory structure)</label>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Output Root Directory (replicates exact directory structure)</label>
                         <input id="outputRoot" type="text" placeholder="e.g. C:\data\fda_guidance_processed" class="w-full text-sm font-mono border rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-400 outline-none">
                     </div>
                 </div>
 
-                <div class="flex items-center justify-between border-t pt-4 border-slate-100">
-                    <label class="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
-                        <input id="overwriteExisting" type="checkbox" class="accent-indigo-600 w-4 h-4 rounded">
-                        <span>Overwrite existing output files (default skips already processed files)</span>
-                    </label>
+                <div class="flex flex-wrap items-center justify-between border-t pt-4 border-slate-100 gap-3">
+                    <div class="flex items-center gap-4">
+                        <label class="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
+                            <input id="overwriteExisting" type="checkbox" class="accent-indigo-600 w-4 h-4 rounded">
+                            <span>Force Overwrite (default skips already completed files)</span>
+                        </label>
+                        <div class="flex items-center gap-2 text-xs font-medium text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
+                            <i class="fa-solid fa-bolt text-amber-500"></i>
+                            <label for="concurrencyInput">Concurrent Files:</label>
+                            <input id="concurrencyInput" type="number" min="1" max="50" value="10" class="w-14 text-center font-bold font-mono border rounded px-1 py-0.5 bg-white outline-none focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                    </div>
 
                     <div class="flex gap-2">
                         <button id="scanBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2 rounded-lg text-sm transition-all flex items-center gap-1.5">
                             <i class="fa-solid fa-magnifying-glass"></i>
-                            Scan Files
+                            Scan / Sync DB
                         </button>
-                        <button id="startBatchBtn" disabled class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium px-5 py-2 rounded-lg text-sm transition-all flex items-center gap-1.5 shadow-sm">
+                        <button id="startBatchBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2 rounded-lg text-sm transition-all flex items-center gap-1.5 shadow-sm">
                             <i class="fa-solid fa-play"></i>
-                            Start Sequential Batch
+                            Start Queue (10 Active)
                         </button>
                         <button id="stopBatchBtn" disabled class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-300 font-medium px-4 py-2 rounded-lg text-sm transition-all flex items-center gap-1.5">
-                            <i class="fa-solid fa-stop"></i>
-                            Stop Job
+                            <i class="fa-solid fa-pause"></i>
+                            Pause Queue
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Batch Progress Live Monitor -->
-            <div id="batchProgressCard" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-                <div class="flex items-center justify-between mb-3">
-                    <div>
-                        <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
-                            <span id="batchRunningSpinner" class="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-ping"></span>
-                            <span id="batchStatusTitle">Batch Job Running...</span>
-                        </h3>
-                        <p id="batchCurrentFileSubtitle" class="text-xs font-mono text-slate-500 mt-1 truncate max-w-2xl">Processing file: ...</p>
-                    </div>
-                    <div id="batchSummaryStats" class="text-xs font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg">
-                        0 / 0 Completed
-                    </div>
+            <!-- Queue Metrics & Live Overview Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+                <div class="bg-white p-3.5 rounded-xl border border-slate-200 text-center">
+                    <span class="text-xs text-slate-400 font-medium block">Total Files</span>
+                    <span id="metricTotal" class="text-xl font-bold text-slate-800">0</span>
                 </div>
-
-                <!-- Overall File Progress Bar -->
-                <div class="mb-4">
-                    <div class="flex justify-between text-xs text-slate-500 mb-1">
-                        <span>Overall File Queue</span>
-                        <span id="overallPct">0%</span>
-                    </div>
-                    <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                        <div id="overallBar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                    </div>
+                <div class="bg-white p-3.5 rounded-xl border border-slate-200 text-center">
+                    <span class="text-xs text-indigo-500 font-medium block">Active (Max 10)</span>
+                    <span id="metricActive" class="text-xl font-bold text-indigo-600">0</span>
                 </div>
-
-                <!-- Current File Chunk Progress Bar -->
-                <div>
-                    <div class="flex justify-between text-xs text-slate-500 mb-1">
-                        <span>Current File Chunks</span>
-                        <span id="chunkPct">0 / 0 Chunks</span>
-                    </div>
-                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div id="chunkBar" class="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                    </div>
+                <div class="bg-white p-3.5 rounded-xl border border-slate-200 text-center">
+                    <span class="text-xs text-slate-500 font-medium block">Pending</span>
+                    <span id="metricPending" class="text-xl font-bold text-slate-600">0</span>
+                </div>
+                <div class="bg-white p-3.5 rounded-xl border border-slate-200 text-center">
+                    <span class="text-xs text-emerald-500 font-medium block">Completed</span>
+                    <span id="metricCompleted" class="text-xl font-bold text-emerald-600">0</span>
+                </div>
+                <div class="bg-white p-3.5 rounded-xl border border-slate-200 text-center">
+                    <span class="text-xs text-amber-500 font-medium block">Skipped</span>
+                    <span id="metricSkipped" class="text-xl font-bold text-amber-600">0</span>
+                </div>
+                <div class="bg-white p-3.5 rounded-xl border border-slate-200 text-center">
+                    <span class="text-xs text-rose-500 font-medium block">Failed</span>
+                    <span id="metricFailed" class="text-xl font-bold text-rose-600">0</span>
                 </div>
             </div>
 
-            <!-- Discovered / Processed Files Table -->
-            <div id="batchTableCard" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-6">
-                <h3 class="font-bold text-slate-800 text-sm mb-3 flex items-center justify-between">
-                    <span>Discovered Files Queue (<span id="fileCountBadge">0</span>)</span>
-                    <span class="text-xs font-normal text-slate-400">Strictly 1 file processed at a time</span>
-                </h3>
+            <!-- Table Card with Individual Buttons per Row -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <h3 class="font-bold text-slate-800 text-sm">Persistent Queue Table</h3>
+                        <div class="flex gap-1.5 text-xs">
+                            <button onclick="filterStatus('ALL')" class="filter-btn px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 font-semibold">All</button>
+                            <button onclick="filterStatus('PROCESSING')" class="filter-btn px-2.5 py-1 rounded-md text-slate-500 hover:bg-slate-100">Processing</button>
+                            <button onclick="filterStatus('PENDING')" class="filter-btn px-2.5 py-1 rounded-md text-slate-500 hover:bg-slate-100">Pending</button>
+                            <button onclick="filterStatus('FAILED')" class="filter-btn px-2.5 py-1 rounded-md text-slate-500 hover:bg-slate-100">Failed</button>
+                            <button onclick="filterStatus('COMPLETED')" class="filter-btn px-2.5 py-1 rounded-md text-slate-500 hover:bg-slate-100">Completed</button>
+                        </div>
+                    </div>
+                    <button onclick="refreshTable()" class="text-xs text-slate-500 hover:text-indigo-600 flex items-center gap-1">
+                        <i class="fa-solid fa-rotate"></i> Refresh
+                    </button>
+                </div>
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs border-collapse">
                         <thead>
                             <tr class="border-b border-slate-200 text-slate-400 uppercase tracking-wider font-semibold">
-                                <th class="py-2.5 px-3">#</th>
-                                <th class="py-2.5 px-3">Relative Path (docling_chunks.json)</th>
-                                <th class="py-2.5 px-3">Chunks</th>
+                                <th class="py-2.5 px-3">ID</th>
+                                <th class="py-2.5 px-3">Relative Path</th>
+                                <th class="py-2.5 px-3">Progress</th>
                                 <th class="py-2.5 px-3">Status</th>
                                 <th class="py-2.5 px-3">Extracted Graph</th>
                                 <th class="py-2.5 px-3">Time</th>
+                                <th class="py-2.5 px-3 text-right">Row Actions</th>
                             </tr>
                         </thead>
                         <tbody id="batchFilesBody" class="divide-y divide-slate-100 font-mono">
                             <tr>
-                                <td colspan="6" class="text-center py-6 text-slate-400 font-sans">
-                                    No directory scanned yet. Enter an Input and Output Root above and click "Scan Files".
+                                <td colspan="7" class="text-center py-8 text-slate-400 font-sans">
+                                    No files in database. Enter Input and Output Root above and click "Scan / Sync DB".
                                 </td>
                             </tr>
                         </tbody>
@@ -179,7 +192,7 @@
             </div>
         </div>
 
-        <!-- TAB 2: SINGLE FILE UPLOAD MODE (Original mode) -->
+        <!-- TAB 2: SINGLE FILE UPLOAD MODE -->
         <div id="singleTabSection" class="hidden">
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
                 <div id="dropzone" class="border-2 border-dashed border-indigo-200 hover:border-indigo-500 bg-indigo-50/40 rounded-xl p-8 text-center cursor-pointer transition-all">
@@ -210,7 +223,6 @@
                 </div>
             </div>
 
-            <!-- Single File Result Card -->
             <div id="resultCard" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
                 <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
                     <div class="flex items-center gap-3">
@@ -238,6 +250,30 @@
         </div>
     </div>
 
+    <!-- Error Modal -->
+    <div id="errorModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-rose-700 flex items-center gap-2 text-sm">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    File Processing Error Details
+                </h3>
+                <button onclick="closeErrorModal()" class="text-slate-400 hover:text-slate-600 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="my-4">
+                <div class="text-xs text-slate-500 mb-1">Relative Path: <span id="errorModalPath" class="font-mono text-slate-800 font-semibold"></span></div>
+                <div class="bg-rose-50 text-rose-900 p-3 rounded-lg text-xs font-mono whitespace-pre-wrap max-h-60 overflow-y-auto border border-rose-200" id="errorModalText"></div>
+            </div>
+            <div class="flex justify-end">
+                <button onclick="closeErrorModal()" class="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Tab switching
         const tabBatchBtn = document.getElementById('tabBatchBtn');
@@ -259,7 +295,7 @@
             batchTabSection.classList.add('hidden');
         });
 
-        // Global Settings & Status
+        // Health & Defaults
         const serviceStatus = document.getElementById('serviceStatus');
         let defaultsLoaded = false;
 
@@ -313,7 +349,7 @@
         });
 
         // -------------------------------------------------------------
-        // BATCH MODE LOGIC
+        // BATCH & SQLITE LOGIC
         // -------------------------------------------------------------
         const scanBtn = document.getElementById('scanBtn');
         const startBatchBtn = document.getElementById('startBatchBtn');
@@ -321,13 +357,14 @@
         const inputRoot = document.getElementById('inputRoot');
         const outputRoot = document.getElementById('outputRoot');
         const overwriteExisting = document.getElementById('overwriteExisting');
+        const concurrencyInput = document.getElementById('concurrencyInput');
         const batchFilesBody = document.getElementById('batchFilesBody');
-        const fileCountBadge = document.getElementById('fileCountBadge');
-        const batchProgressCard = document.getElementById('batchProgressCard');
 
-        let scannedFiles = [];
-        let pollingInterval = null;
+        let currentFilter = 'ALL';
+        let batchFilesList = [];
+        let pollingTimer = null;
 
+        // Scan directory and sync to SQLite
         scanBtn.addEventListener('click', async () => {
             const inDir = inputRoot.value.trim();
             const outDir = outputRoot.value.trim();
@@ -337,7 +374,7 @@
             }
 
             scanBtn.disabled = true;
-            scanBtn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Scanning...';
+            scanBtn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Syncing...';
 
             try {
                 const res = await fetch('/api/batch/scan', {
@@ -346,61 +383,167 @@
                     body: JSON.stringify({ inputRoot: inDir, outputRoot: outDir })
                 });
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Failed to scan directory');
+                if (!res.ok) throw new Error(data.error || 'Failed to scan');
 
-                scannedFiles = data.files || [];
-                fileCountBadge.textContent = scannedFiles.length;
-                renderBatchTable(scannedFiles);
-                startBatchBtn.disabled = scannedFiles.length === 0;
+                alert(`Sync Complete: Found ${data.totalFound} files (${data.newAdded} newly added, ${data.alreadyInDb} already in database).`);
+                await refreshTable();
             } catch (err) {
                 alert('Scan Error: ' + err.message);
             } finally {
                 scanBtn.disabled = false;
-                scanBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Scan Files';
+                scanBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Scan / Sync DB';
             }
         });
 
-        function renderBatchTable(files) {
-            if (!files || files.length === 0) {
-                batchFilesBody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-slate-400 font-sans">No matching docling_chunks.json found in input directory.</td></tr>';
+        // Filter status tabs
+        function filterStatus(status) {
+            currentFilter = status;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                if (btn.textContent.trim().toUpperCase() === status) {
+                    btn.className = 'filter-btn px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 font-semibold';
+                } else {
+                    btn.className = 'filter-btn px-2.5 py-1 rounded-md text-slate-500 hover:bg-slate-100';
+                }
+            });
+            renderTable();
+        }
+
+        async function refreshTable() {
+            try {
+                const url = currentFilter === 'ALL' ? '/api/batch/files' : `/api/batch/files?status=${currentFilter}`;
+                const res = await fetch(url);
+                batchFilesList = await res.json();
+                renderTable();
+                await updateQueueMetrics();
+            } catch (e) {
+                console.error('Error refreshing table', e);
+            }
+        }
+
+        async function updateQueueMetrics() {
+            try {
+                const res = await fetch('/api/batch/status');
+                const m = await res.json();
+                document.getElementById('metricTotal').textContent = m.total || 0;
+                document.getElementById('metricActive').textContent = m.activeWorkers || 0;
+                document.getElementById('metricPending').textContent = m.pending || 0;
+                document.getElementById('metricCompleted').textContent = m.completed || 0;
+                document.getElementById('metricSkipped').textContent = m.skipped || 0;
+                document.getElementById('metricFailed').textContent = m.failed || 0;
+
+                if (m.running) {
+                    startBatchBtn.disabled = true;
+                    stopBatchBtn.disabled = false;
+                } else {
+                    startBatchBtn.disabled = false;
+                    stopBatchBtn.disabled = true;
+                }
+            } catch (e) {}
+        }
+
+        function renderTable() {
+            if (!batchFilesList || batchFilesList.length === 0) {
+                batchFilesBody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400 font-sans">No files found matching filter "${currentFilter}".</td></tr>`;
                 return;
             }
 
-            batchFilesBody.innerHTML = files.map((f, i) => {
+            batchFilesBody.innerHTML = batchFilesList.map(f => {
                 let badgeClass = 'bg-slate-100 text-slate-600';
                 if (f.status === 'PROCESSING') badgeClass = 'bg-indigo-100 text-indigo-700 animate-pulse';
                 else if (f.status === 'COMPLETED') badgeClass = 'bg-emerald-100 text-emerald-700';
                 else if (f.status === 'SKIPPED') badgeClass = 'bg-amber-100 text-amber-700';
                 else if (f.status === 'FAILED') badgeClass = 'bg-rose-100 text-rose-700';
 
-                const graphInfo = f.extractedNodes != null && f.extractedNodes > 0
-                    ? `${f.extractedNodes} nodes, ${f.extractedEdges} edges`
-                    : '-';
+                const chunksStr = f.totalChunks > 0 ? `${f.processedChunks || 0} / ${f.totalChunks}` : '-';
+                const graphInfo = f.extractedNodes > 0 ? `${f.extractedNodes} nodes, ${f.extractedEdges} edges` : '-';
+                const durationStr = f.durationMs > 0 ? `${(f.durationMs / 1000).toFixed(1)}s` : '-';
 
-                const durationStr = f.durationMs ? `${(f.durationMs / 1000).toFixed(1)}s` : '-';
-                const chunksStr = f.totalChunks ? `${f.processedChunks || 0} / ${f.totalChunks}` : '-';
+                // Individual row action buttons
+                let actionBtns = '';
+                if (f.status === 'PENDING' || f.status === 'SKIPPED') {
+                    actionBtns = `
+                        <button onclick="runFile(${f.id})" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-[11px] font-semibold transition-all">
+                            <i class="fa-solid fa-play"></i> Process
+                        </button>
+                    `;
+                } else if (f.status === 'FAILED') {
+                    actionBtns = `
+                        <button onclick="showErrorModal(${f.id})" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded text-[11px] font-semibold transition-all mr-1" title="View Error">
+                            <i class="fa-solid fa-circle-info"></i>
+                        </button>
+                        <button onclick="runFile(${f.id})" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-[11px] font-semibold transition-all">
+                            <i class="fa-solid fa-rotate-right"></i> Retry
+                        </button>
+                    `;
+                } else if (f.status === 'PROCESSING') {
+                    actionBtns = `
+                        <span class="text-indigo-600 text-xs font-sans italic flex items-center justify-end gap-1">
+                            <i class="fa-solid fa-circle-notch animate-spin"></i> Active
+                        </span>
+                    `;
+                } else if (f.status === 'COMPLETED') {
+                    actionBtns = `
+                        <button onclick="resetFile(${f.id})" class="text-slate-400 hover:text-slate-600 text-xs p-1" title="Reset to Pending">
+                            <i class="fa-solid fa-arrow-rotate-left"></i>
+                        </button>
+                    `;
+                }
 
                 return `
                     <tr class="hover:bg-slate-50 transition-colors">
-                        <td class="py-2 px-3 text-slate-400 font-sans">${i + 1}</td>
-                        <td class="py-2 px-3 text-slate-800 font-medium truncate max-w-md" title="${f.inputFullPath}">${f.relativePath}</td>
-                        <td class="py-2 px-3 text-slate-500">${chunksStr}</td>
-                        <td class="py-2 px-3">
+                        <td class="py-2.5 px-3 text-slate-400 font-sans">#${f.id}</td>
+                        <td class="py-2.5 px-3 text-slate-800 font-medium truncate max-w-sm" title="${f.inputFullPath}">${f.relativePath}</td>
+                        <td class="py-2.5 px-3 text-slate-500">${chunksStr}</td>
+                        <td class="py-2.5 px-3">
                             <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${badgeClass}">
                                 ${f.status}
                             </span>
                         </td>
-                        <td class="py-2 px-3 text-slate-600">${graphInfo}</td>
-                        <td class="py-2 px-3 text-slate-500">${durationStr}</td>
+                        <td class="py-2.5 px-3 text-slate-600">${graphInfo}</td>
+                        <td class="py-2.5 px-3 text-slate-500">${durationStr}</td>
+                        <td class="py-2.5 px-3 text-right font-sans whitespace-nowrap">
+                            ${actionBtns}
+                        </td>
                     </tr>
                 `;
             }).join('');
         }
 
+        // Row individual button handlers
+        async function runFile(id) {
+            try {
+                const res = await fetch(`/api/batch/file/${id}/run`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) alert(data.error);
+                await refreshTable();
+            } catch (e) {
+                alert('Run Error: ' + e.message);
+            }
+        }
+
+        async function resetFile(id) {
+            try {
+                await fetch(`/api/batch/file/${id}/reset`, { method: 'POST' });
+                await refreshTable();
+            } catch (e) {}
+        }
+
+        function showErrorModal(id) {
+            const f = batchFilesList.find(x => x.id === id);
+            if (!f) return;
+            document.getElementById('errorModalPath').textContent = f.relativePath;
+            document.getElementById('errorModalText').textContent = f.errorMessage || 'Unknown error occurred.';
+            document.getElementById('errorModal').classList.remove('hidden');
+        }
+
+        function closeErrorModal() {
+            document.getElementById('errorModal').classList.add('hidden');
+        }
+
+        // Global Batch Start / Pause
         startBatchBtn.addEventListener('click', async () => {
             const inDir = inputRoot.value.trim();
             const outDir = outputRoot.value.trim();
-            if (!inDir || !outDir) return;
 
             const entities = document.getElementById('entityLabels').value.split(',').map(s => s.trim()).filter(Boolean);
             const relations = document.getElementById('relationLabels').value.split(',').map(s => s.trim()).filter(Boolean);
@@ -409,6 +552,7 @@
                 inputRoot: inDir,
                 outputRoot: outDir,
                 overwriteExisting: overwriteExisting.checked,
+                concurrency: parseInt(concurrencyInput.value) || 10,
                 entityLabels: entities,
                 relationLabels: relations,
                 threshold: parseFloat(document.getElementById('threshold').value),
@@ -416,90 +560,40 @@
             };
 
             try {
-                startBatchBtn.disabled = true;
-                scanBtn.disabled = true;
-                stopBatchBtn.disabled = false;
-                batchProgressCard.classList.remove('hidden');
-
                 const res = await fetch('/api/batch/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Failed to start batch');
-
-                startPollingBatch();
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Failed to start queue');
+                }
+                startBatchBtn.disabled = true;
+                stopBatchBtn.disabled = false;
+                startPolling();
             } catch (err) {
                 alert('Start Error: ' + err.message);
-                startBatchBtn.disabled = false;
-                scanBtn.disabled = false;
-                stopBatchBtn.disabled = true;
             }
         });
 
         stopBatchBtn.addEventListener('click', async () => {
-            stopBatchBtn.disabled = true;
-            stopBatchBtn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Stopping...';
             try {
                 await fetch('/api/batch/stop', { method: 'POST' });
+                stopBatchBtn.disabled = true;
             } catch (e) {}
         });
 
-        function startPollingBatch() {
-            if (pollingInterval) clearInterval(pollingInterval);
-            pollingInterval = setInterval(async () => {
-                try {
-                    const res = await fetch('/api/batch/status');
-                    const status = await res.json();
-
-                    if (!status) return;
-
-                    // Update UI counters
-                    const completed = status.completedFiles || 0;
-                    const skipped = status.skippedFiles || 0;
-                    const failed = status.failedFiles || 0;
-                    const total = status.totalFiles || 0;
-                    const doneFiles = completed + skipped + failed;
-
-                    const overallPctVal = total > 0 ? Math.round((doneFiles / total) * 100) : 0;
-                    document.getElementById('overallBar').style.width = overallPctVal + '%';
-                    document.getElementById('overallPct').textContent = `${doneFiles} / ${total} (${overallPctVal}%)`;
-                    document.getElementById('batchSummaryStats').textContent = `${completed} Completed, ${skipped} Skipped, ${failed} Failed`;
-
-                    if (status.currentFileRelativePath) {
-                        document.getElementById('batchCurrentFileSubtitle').textContent = `[${status.currentFileIndex}/${total}] Processing: ${status.currentFileRelativePath}`;
-                    }
-
-                    // Update chunk progress
-                    const curChunks = status.currentFileProcessedChunks || 0;
-                    const totalChunks = status.currentFileTotalChunks || 0;
-                    const chunkPctVal = totalChunks > 0 ? Math.round((curChunks / totalChunks) * 100) : 0;
-                    document.getElementById('chunkBar').style.width = chunkPctVal + '%';
-                    document.getElementById('chunkPct').textContent = `${curChunks} / ${totalChunks} Chunks (${chunkPctVal}%)`;
-
-                    // Update files table
-                    if (status.files && status.files.length > 0) {
-                        renderBatchTable(status.files);
-                    }
-
-                    // Check if job completed
-                    if (!status.running) {
-                        clearInterval(pollingInterval);
-                        pollingInterval = null;
-                        startBatchBtn.disabled = false;
-                        scanBtn.disabled = false;
-                        stopBatchBtn.disabled = true;
-                        stopBatchBtn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Job';
-                        document.getElementById('batchStatusTitle').textContent = 'Batch Job Completed';
-                        document.getElementById('batchRunningSpinner').classList.remove('animate-ping', 'bg-indigo-600');
-                        document.getElementById('batchRunningSpinner').classList.add('bg-emerald-500');
-                    }
-                } catch (e) {
-                    console.error('Polling error', e);
-                }
-            }, 1000);
+        function startPolling() {
+            if (pollingTimer) clearInterval(pollingTimer);
+            pollingTimer = setInterval(async () => {
+                await refreshTable();
+            }, 1200);
         }
+
+        // Initial table load
+        refreshTable();
+        startPolling();
 
         // -------------------------------------------------------------
         // SINGLE FILE MODE LOGIC

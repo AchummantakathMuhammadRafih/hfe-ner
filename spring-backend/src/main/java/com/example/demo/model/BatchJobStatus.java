@@ -11,6 +11,7 @@ public class BatchJobStatus {
     private int completedFiles;
     private int failedFiles;
     private int skippedFiles;
+    private int concurrency = 10;
     private int currentFileIndex;
     private String currentFileRelativePath;
     private int currentFileTotalChunks;
@@ -18,6 +19,9 @@ public class BatchJobStatus {
     private long startedAt;
     private long finishedAt;
     private List<BatchFileItem> files = new ArrayList<>();
+
+    public int getConcurrency() { return concurrency; }
+    public void setConcurrency(int concurrency) { this.concurrency = concurrency; }
 
     public boolean isRunning() { return running; }
     public void setRunning(boolean running) { this.running = running; }

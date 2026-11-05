@@ -18,8 +18,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
@@ -30,8 +29,8 @@ public class SequentialBatchSchedulerService {
     private final GlinerClientService glinerClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // STRICTLY ONE THREAD: Only one file processed at any time
-    private final ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
+    // Background master job runner
+    private final ExecutorService masterExecutor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
     private final AtomicBoolean stopRequested = new AtomicBoolean(false);
 
@@ -52,6 +51,9 @@ public class SequentialBatchSchedulerService {
             throw new IllegalArgumentException("No 'docling_chunks.json' files found in: " + req.getInputRoot());
         }
 
+        int concurrency = req.getConcurrency() > 0 ? req.getConcurrency() : 10;
+        req.setConcurrency(concurrency);
+
         // Initialize status
         currentStatus.setRunning(true);
         currentStatus.setInputRoot(req.getInputRoot());
@@ -61,6 +63,7 @@ public class SequentialBatchSchedulerService {
         currentStatus.setFailedFiles(0);
         currentStatus.setSkippedFiles(0);
         currentStatus.setCurrentFileIndex(0);
+        currentStatus.setConcurrency(concurrency);
         currentStatus.setStartedAt(System.currentTimeMillis());
         currentStatus.setFinishedAt(0);
         currentStatus.setFiles(files);
@@ -68,15 +71,15 @@ public class SequentialBatchSchedulerService {
         isRunning.set(true);
         stopRequested.set(false);
 
-        // Submit sequential processing job
-        singleThreadExecutor.submit(() -> executeSequentialQueue(req, files));
+        // Submit concurrent batch processing job
+        masterExecutor.submit(() -> executeConcurrentBatch(req, files));
 
         return currentStatus;
     }
 
     public void stopBatchJob() {
         if (isRunning.get()) {
-            log.info("Batch stop requested. Job will stop after current file completes.");
+            log.info("Batch stop requested. Job will stop after currently running files complete.");
             stopRequested.set(true);
         }
     }
@@ -85,52 +88,74 @@ public class SequentialBatchSchedulerService {
         return currentStatus;
     }
 
-    private void executeSequentialQueue(BatchJobRequest req, List<BatchFileItem> files) {
+    private void executeConcurrentBatch(BatchJobRequest req, List<BatchFileItem> files) {
+        int poolSize = req.getConcurrency();
+        ExecutorService workerPool = Executors.newFixedThreadPool(poolSize);
+
         try {
             log.info("==========================================================================");
-            log.info("STARTING BATCH JOB: {} files queued for sequential execution (strictly 1 file at a time)", files.size());
+            log.info("STARTING BATCH JOB: {} files queued with CONCURRENCY = {} simultaneous files", files.size(), poolSize);
             log.info("Input Root: {}", req.getInputRoot());
             log.info("Output Root: {}", req.getOutputRoot());
             log.info("==========================================================================");
 
-            for (int fileIdx = 0; fileIdx < files.size(); fileIdx++) {
-                if (stopRequested.get()) {
-                    log.info("Batch job stopped by user request. Terminating remaining queue.");
-                    break;
-                }
+            CompletableFuture<?>[] futures = new CompletableFuture<?>[files.size()];
 
-                BatchFileItem fileItem = files.get(fileIdx);
-                currentStatus.setCurrentFileIndex(fileIdx + 1);
-                currentStatus.setCurrentFileRelativePath(fileItem.getRelativePath());
+            for (int i = 0; i < files.size(); i++) {
+                final int fileIdx = i;
+                final BatchFileItem fileItem = files.get(fileIdx);
 
-                Path targetFile = Paths.get(fileItem.getOutputFullPath());
+                futures[i] = CompletableFuture.runAsync(() -> {
+                    if (stopRequested.get()) {
+                        log.info("Skipping queued file due to stop request: {}", fileItem.getRelativePath());
+                        return;
+                    }
 
-                // Skip if already exists and overwrite not requested
-                if (Files.exists(targetFile) && !req.isOverwriteExisting()) {
-                    log.info("[{}/{}] SKIPPING already existing: {}", fileIdx + 1, files.size(), fileItem.getRelativePath());
-                    fileItem.setStatus("SKIPPED");
-                    currentStatus.setSkippedFiles(currentStatus.getSkippedFiles() + 1);
-                    continue;
-                }
+                    Path targetFile = Paths.get(fileItem.getOutputFullPath());
 
-                fileItem.setStatus("PROCESSING");
-                long startFileTime = System.currentTimeMillis();
+                    // Skip if already exists and overwrite not requested
+                    if (Files.exists(targetFile) && !req.isOverwriteExisting()) {
+                        log.info("[File #{}] SKIPPING already existing: {}", fileIdx + 1, fileItem.getRelativePath());
+                        fileItem.setStatus("SKIPPED");
+                        synchronized (currentStatus) {
+                            currentStatus.setSkippedFiles(currentStatus.getSkippedFiles() + 1);
+                        }
+                        return;
+                    }
 
-                try {
-                    processSingleFile(fileItem, req);
-                    fileItem.setStatus("COMPLETED");
-                    fileItem.setDurationMs(System.currentTimeMillis() - startFileTime);
-                    currentStatus.setCompletedFiles(currentStatus.getCompletedFiles() + 1);
-                    log.info("[{}/{}] COMPLETED: {} in {}ms", fileIdx + 1, files.size(), fileItem.getRelativePath(), fileItem.getDurationMs());
-                } catch (Exception ex) {
-                    fileItem.setStatus("FAILED");
-                    fileItem.setErrorMessage(ex.getMessage());
-                    fileItem.setDurationMs(System.currentTimeMillis() - startFileTime);
-                    currentStatus.setFailedFiles(currentStatus.getFailedFiles() + 1);
-                    log.error("[{}/{}] FAILED: {} - Error: {}", fileIdx + 1, files.size(), fileItem.getRelativePath(), ex.getMessage(), ex);
-                }
+                    fileItem.setStatus("PROCESSING");
+                    synchronized (currentStatus) {
+                        currentStatus.setCurrentFileIndex(fileIdx + 1);
+                        currentStatus.setCurrentFileRelativePath(fileItem.getRelativePath());
+                    }
+
+                    long startFileTime = System.currentTimeMillis();
+                    try {
+                        processSingleFile(fileItem, req);
+                        fileItem.setStatus("COMPLETED");
+                        fileItem.setDurationMs(System.currentTimeMillis() - startFileTime);
+                        synchronized (currentStatus) {
+                            currentStatus.setCompletedFiles(currentStatus.getCompletedFiles() + 1);
+                        }
+                        log.info("[File #{}] COMPLETED: {} in {}ms", fileIdx + 1, fileItem.getRelativePath(), fileItem.getDurationMs());
+                    } catch (Exception ex) {
+                        fileItem.setStatus("FAILED");
+                        fileItem.setErrorMessage(ex.getMessage());
+                        fileItem.setDurationMs(System.currentTimeMillis() - startFileTime);
+                        synchronized (currentStatus) {
+                            currentStatus.setFailedFiles(currentStatus.getFailedFiles() + 1);
+                        }
+                        log.error("[File #{}] FAILED: {} - Error: {}", fileIdx + 1, fileItem.getRelativePath(), ex.getMessage(), ex);
+                    }
+                }, workerPool);
             }
+
+            CompletableFuture.allOf(futures).join();
+
+        } catch (Exception e) {
+            log.error("Batch execution encountered an error: {}", e.getMessage(), e);
         } finally {
+            workerPool.shutdown();
             isRunning.set(false);
             currentStatus.setRunning(false);
             currentStatus.setFinishedAt(System.currentTimeMillis());

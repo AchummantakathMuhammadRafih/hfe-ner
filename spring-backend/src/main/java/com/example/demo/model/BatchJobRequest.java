@@ -6,10 +6,14 @@ public class BatchJobRequest {
     private String inputRoot;
     private String outputRoot;
     private boolean overwriteExisting = false;
+    private int concurrency = 10;
     private List<String> entityLabels;
     private List<String> relationLabels;
     private Double threshold;
     private Double relationThreshold;
+
+    public int getConcurrency() { return concurrency; }
+    public void setConcurrency(int concurrency) { this.concurrency = concurrency; }
 
     public String getInputRoot() { return inputRoot; }
     public void setInputRoot(String inputRoot) { this.inputRoot = inputRoot; }
