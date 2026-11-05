@@ -70,6 +70,13 @@ public class PersistentBatchQueueService {
         }
     }
 
+    public synchronized void clearDatabase() {
+        stopQueue();
+        activeProcessingFileIds.clear();
+        repository.deleteAll();
+        log.info("Cleared all entries from SQLite batch database.");
+    }
+
     public synchronized Map<String, Object> scanAndSyncDirectory(String inputRoot, String outputRoot) throws Exception {
         var scannedItems = scannerService.scanDirectory(inputRoot, outputRoot);
         int added = 0;

@@ -109,9 +109,13 @@
                             <i class="fa-solid fa-magnifying-glass"></i>
                             Scan / Sync DB
                         </button>
+                        <button id="clearDbBtn" class="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-medium px-3.5 py-2 rounded-lg text-sm transition-all flex items-center gap-1.5" title="Clear all records to start completely fresh">
+                            <i class="fa-solid fa-trash-can"></i>
+                            Clear DB
+                        </button>
                         <button id="startBatchBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2 rounded-lg text-sm transition-all flex items-center gap-1.5 shadow-sm">
                             <i class="fa-solid fa-play"></i>
-                            Start Queue (10 Active)
+                            Start Queue
                         </button>
                         <button id="stopBatchBtn" disabled class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-300 font-medium px-4 py-2 rounded-lg text-sm transition-all flex items-center gap-1.5">
                             <i class="fa-solid fa-pause"></i>
@@ -395,7 +399,18 @@
             }
         });
 
-        // Filter status tabs
+        // Clear Database
+        document.getElementById('clearDbBtn').addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to clear all database entries and start completely fresh?')) return;
+            try {
+                const res = await fetch('/api/batch/clear', { method: 'POST' });
+                const data = await res.json();
+                alert(data.message || 'Database cleared.');
+                await refreshTable();
+            } catch (err) {
+                alert('Clear Error: ' + err.message);
+            }
+        });
         function filterStatus(status) {
             currentFilter = status;
             document.querySelectorAll('.filter-btn').forEach(btn => {

@@ -28,8 +28,10 @@ print(f"Model successfully loaded and moved to {DEVICE.upper()}!")
 print("=" * 60)
 
 # Sliding window parameters
-MAX_WINDOW_WORDS = 320   # Word limit per sub-window (well within 384)
-OVERLAP_WORDS = 60       # Overlap words between consecutive windows
+# Note: GLiNER tokenizes by punctuation / word boundaries; with 91 prompt labels (~376 tokens),
+# keeping MAX_WINDOW_WORDS at 250 guarantees total sequence length stays well under 2048.
+MAX_WINDOW_WORDS = 250   # Word limit per sub-window
+OVERLAP_WORDS = 50       # Overlap words between consecutive windows
 
 class GraphChunkRequest(BaseModel):
     chunk_index: int

@@ -74,6 +74,12 @@ public class BatchJobController {
         return ResponseEntity.ok(queueService.getQueueStatus());
     }
 
+    @PostMapping("/clear")
+    public ResponseEntity<?> clearDatabase() {
+        queueService.clearDatabase();
+        return ResponseEntity.ok(Map.of("message", "All database entries have been cleared successfully."));
+    }
+
     @PostMapping("/file/{id}/run")
     public ResponseEntity<?> runSingleFile(@PathVariable Long id) {
         boolean queued = queueService.processSingleFileById(id);
