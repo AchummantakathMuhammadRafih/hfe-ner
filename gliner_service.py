@@ -1,4 +1,7 @@
 import os
+# Set PyTorch CUDA memory allocator to reduce fragmentation
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 import re
 import math
 from typing import List, Dict, Any, Optional
@@ -91,14 +94,19 @@ def extract_graph(req: GraphChunkRequest):
         # Step 1: Sliding window for 1024-token chunks
         windows = split_into_windows(req.text, max_words=MAX_WINDOW_WORDS, overlap=OVERLAP_WORDS)
 
-        # Step 2: Run inference on each sub-window using GLiNER Knowledge Graph Construction method
-        entities_batch, relations_batch = model.inference(
-            windows,
-            labels=req.entity_labels,
-            relations=req.relation_labels,
-            threshold=req.threshold,
-            relation_threshold=req.relation_threshold
-        )
+        # Step 2: Run inference under no_grad to disable gradient graph memory retention
+        with torch.no_grad():
+            entities_batch, relations_batch = model.inference(
+                windows,
+                labels=req.entity_labels,
+                relations=req.relation_labels,
+                threshold=req.threshold,
+                relation_threshold=req.relation_threshold
+            )
+
+        # Clear unused cached CUDA memory after each chunk
+        if DEVICE == "cuda":
+            torch.cuda.empty_cache()
 
         # Step 3: Deduplicate entities across windows (keep highest score)
         # Key: (clean_name_lower, entity_type)
