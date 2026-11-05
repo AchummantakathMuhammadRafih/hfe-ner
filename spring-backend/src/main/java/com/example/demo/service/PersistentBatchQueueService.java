@@ -136,6 +136,9 @@ public class PersistentBatchQueueService {
         }
 
         activeProcessingFileIds.add(id);
+        entity.setStatus("PROCESSING");
+        repository.save(entity);
+
         workerPool.submit(() -> {
             try {
                 executeFileProcessing(entity);
@@ -267,7 +270,7 @@ public class PersistentBatchQueueService {
             int totalEdges = 0;
 
             for (int c = 0; c < totalChunks; c++) {
-                if (stopRequested.get()) {
+                if (stopRequested.get() && isQueueRunning.get()) {
                     entity.setStatus("PENDING");
                     repository.save(entity);
                     return;
