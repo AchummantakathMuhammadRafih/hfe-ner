@@ -62,10 +62,9 @@ public class DoclingEnrichmentService {
 
             ObjectNode chunkObj = (ObjectNode) chunkItem;
             int chunkIndex = chunkObj.has("chunk_index") ? chunkObj.get("chunk_index").asInt() : i;
-            String text = chunkObj.has("text") ? chunkObj.get("text").asText() : "";
-            if (text.isBlank() && chunkObj.has("raw_text")) {
-                text = chunkObj.get("raw_text").asText();
-            }
+            String text = chunkObj.has("raw_text") && !chunkObj.get("raw_text").asText().isBlank()
+                    ? chunkObj.get("raw_text").asText()
+                    : (chunkObj.has("text") ? chunkObj.get("text").asText() : "");
 
             int wordCount = text.isBlank() ? 0 : text.split("\\s+").length;
             int currentStep = i + 1;

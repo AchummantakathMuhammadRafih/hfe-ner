@@ -281,10 +281,9 @@ public class PersistentBatchQueueService {
 
                 ObjectNode chunkObj = (ObjectNode) chunkItem;
                 int chunkIndex = chunkObj.has("chunk_index") ? chunkObj.get("chunk_index").asInt() : c;
-                String text = chunkObj.has("text") ? chunkObj.get("text").asText() : "";
-                if (text.isBlank() && chunkObj.has("raw_text")) {
-                    text = chunkObj.get("raw_text").asText();
-                }
+                String text = chunkObj.has("raw_text") && !chunkObj.get("raw_text").asText().isBlank()
+                        ? chunkObj.get("raw_text").asText()
+                        : (chunkObj.has("text") ? chunkObj.get("text").asText() : "");
 
                 // Call GLiNER remote inference
                 GlinerChunkResponse kgRes;
