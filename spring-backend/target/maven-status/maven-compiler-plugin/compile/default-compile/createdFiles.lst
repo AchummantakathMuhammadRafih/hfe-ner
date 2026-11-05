@@ -1,9 +1,15 @@
+com\example\demo\model\BatchJobRequest.class
 com\example\demo\DemoApplication.class
+com\example\demo\model\BatchFileItem.class
 com\example\demo\controller\DoclingApiController.class
+com\example\demo\service\BatchFileScannerService.class
 com\example\demo\model\Edge.class
 com\example\demo\model\GlinerChunkRequest.class
+com\example\demo\service\SequentialBatchSchedulerService.class
 com\example\demo\service\DoclingEnrichmentService$ProgressCallback.class
+com\example\demo\model\BatchJobStatus.class
 com\example\demo\service\GlinerClientService.class
 com\example\demo\service\DoclingEnrichmentService.class
 com\example\demo\model\Node.class
 com\example\demo\model\GlinerChunkResponse.class
+com\example\demo\controller\BatchJobController.class

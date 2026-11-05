@@ -8,16 +8,16 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800">
-    <div class="max-w-5xl mx-auto py-10 px-4">
+    <div class="max-w-6xl mx-auto py-8 px-4">
         <!-- Header -->
-        <header class="mb-8 flex items-center justify-between border-b pb-6 border-slate-200">
+        <header class="mb-6 flex items-center justify-between border-b pb-5 border-slate-200">
             <div>
                 <h1 class="text-3xl font-bold text-indigo-900 flex items-center gap-3">
                     <i class="fa-solid fa-diagram-project text-indigo-600"></i>
                     Docling KG Builder with GLiNER
                 </h1>
-                <p class="text-sm text-slate-600 mt-1">
-                    Joint Zero-Shot Entity & Relation Extraction using <span class="font-mono bg-slate-200 px-1.5 py-0.5 rounded text-xs text-indigo-800">knowledgator/gliner-relex-large-v1.0</span>
+                <p class="text-xs text-slate-600 mt-1">
+                    Joint Zero-Shot Entity & Relation Extraction using <span class="font-mono bg-slate-200 px-1.5 py-0.5 rounded text-xs text-indigo-800">knowledgator/gliner-relex-large-v1.0</span> (Strictly 1 File at a Time)
                 </p>
             </div>
             <div id="serviceStatus" class="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
@@ -26,126 +26,243 @@
             </div>
         </header>
 
-        <!-- Main Card -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
-            <!-- Dropzone -->
-            <div id="dropzone" class="border-2 border-dashed border-indigo-200 hover:border-indigo-500 bg-indigo-50/40 rounded-xl p-8 text-center cursor-pointer transition-all">
-                <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 mb-3"></i>
-                <h3 class="text-base font-semibold text-slate-700">Drag and drop docling_chunks.json</h3>
-                <p class="text-xs text-slate-500 mt-1">or click to browse your files</p>
-                <input type="file" id="fileInput" accept=".json" class="hidden">
-            </div>
+        <!-- Mode Navigation Tabs -->
+        <div class="flex border-b border-slate-200 mb-6 gap-3">
+            <button id="tabBatchBtn" class="px-5 py-2.5 font-semibold text-sm border-b-2 border-indigo-600 text-indigo-600 flex items-center gap-2">
+                <i class="fa-solid fa-folder-tree"></i>
+                Batch Recursive Directory Mode
+            </button>
+            <button id="tabSingleBtn" class="px-5 py-2.5 font-medium text-sm text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center gap-2">
+                <i class="fa-solid fa-file-arrow-up"></i>
+                Single File Upload Mode
+            </button>
+        </div>
 
-            <!-- Selected File Badge -->
-            <div id="fileInfo" class="hidden mt-4 p-3 bg-slate-100 rounded-lg flex items-center justify-between text-sm">
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-file-code text-indigo-600 text-lg"></i>
-                    <div>
-                        <div id="fileName" class="font-medium text-slate-800">docling_chunks.json</div>
-                        <div id="fileSize" class="text-xs text-slate-500">170 KB</div>
-                    </div>
+        <!-- Global Settings Accordion -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-6">
+            <button id="toggleSettings" class="w-full text-xs font-semibold text-slate-700 flex items-center justify-between hover:text-indigo-600">
+                <span class="flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-indigo-600"></i>
+                    Global Extraction Schema & Thresholds (Applied to both modes)
+                </span>
+                <i id="settingsChevron" class="fa-solid fa-chevron-down text-xs transition-transform"></i>
+            </button>
+
+            <div id="settingsPanel" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 hidden border-t pt-4 border-slate-100">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Entity Labels (Comma-separated)</label>
+                    <textarea id="entityLabels" rows="3" class="w-full text-xs font-mono border rounded-lg p-2 focus:ring-2 focus:ring-indigo-400 outline-none"></textarea>
                 </div>
-                <button id="clearFile" class="text-slate-400 hover:text-red-500 text-sm">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
-            <!-- Settings Accordion -->
-            <div class="mt-6 border-t pt-4 border-slate-100">
-                <button id="toggleSettings" class="text-xs font-semibold text-slate-600 flex items-center gap-2 hover:text-indigo-600">
-                    <i class="fa-solid fa-sliders"></i>
-                    Advanced Extraction Schema & Thresholds
-                    <i id="settingsChevron" class="fa-solid fa-chevron-down text-[10px] transition-transform"></i>
-                </button>
-
-                <div id="settingsPanel" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Entity Labels (Comma-separated)</label>
-                        <textarea id="entityLabels" rows="3" class="w-full text-xs font-mono border rounded-lg p-2 focus:ring-2 focus:ring-indigo-400 outline-none">USE_ENVIRONMENT, USER, DEVICE, HAZARD, TASK, HFE_STUDY, CLINICAL_CONSIDERATION, REGULATION, ORGANIZATION</textarea>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Relation Labels (Comma-separated)</label>
-                        <textarea id="relationLabels" rows="3" class="w-full text-xs font-mono border rounded-lg p-2 focus:ring-2 focus:ring-indigo-400 outline-none">CAUSED_BY, USED_IN, PERFORMED_BY, ASSOCIATED_WITH, APPLIED_TO, REQUIRES, REGULATED_BY</textarea>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Entity Threshold: <span id="threshVal">0.40</span></label>
-                        <input id="threshold" type="range" min="0.1" max="0.9" step="0.05" value="0.4" class="w-full accent-indigo-600">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Relation Threshold: <span id="relThreshVal">0.40</span></label>
-                        <input id="relThreshold" type="range" min="0.1" max="0.9" step="0.05" value="0.4" class="w-full accent-indigo-600">
-                    </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Relation Labels (Comma-separated)</label>
+                    <textarea id="relationLabels" rows="3" class="w-full text-xs font-mono border rounded-lg p-2 focus:ring-2 focus:ring-indigo-400 outline-none"></textarea>
                 </div>
-            </div>
-
-            <!-- Submit Button -->
-            <div class="mt-6">
-                <button id="processBtn" disabled class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg shadow-sm transition-all flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-play"></i>
-                    Process & Construct Knowledge Graph
-                </button>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Entity Threshold: <span id="threshVal">0.40</span></label>
+                    <input id="threshold" type="range" min="0.1" max="0.9" step="0.05" value="0.4" class="w-full accent-indigo-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Relation Threshold: <span id="relThreshVal">0.40</span></label>
+                    <input id="relThreshold" type="range" min="0.1" max="0.9" step="0.05" value="0.4" class="w-full accent-indigo-600">
+                </div>
             </div>
         </div>
 
-        <!-- Progress Card -->
-        <div id="progressCard" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8 text-center">
-            <div class="inline-block animate-spin text-indigo-600 text-3xl mb-3">
-                <i class="fa-solid fa-circle-notch"></i>
-            </div>
-            <h3 class="text-base font-semibold text-slate-800">Extracting Knowledge Graph Entities & Relations...</h3>
-            <p class="text-xs text-slate-500 mt-1">Evaluating 1024-token chunks with sliding windows and normalizing edge weights (1.0 to 5.0)</p>
-        </div>
+        <!-- TAB 1: BATCH RECURSIVE DIRECTORY MODE -->
+        <div id="batchTabSection">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+                <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-gears text-indigo-600"></i>
+                    Recursive Directory Configuration
+                </h2>
 
-        <!-- Results & Download Card -->
-        <div id="resultCard" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-lg">
-                        <i class="fa-solid fa-check"></i>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Input Root Directory (scanned recursively for docling_chunks.json)</label>
+                        <input id="inputRoot" type="text" placeholder="e.g. C:\data\fda_guidance_raw" class="w-full text-sm font-mono border rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-400 outline-none">
                     </div>
                     <div>
-                        <h3 class="font-bold text-slate-800 text-lg">Knowledge Graph Generated!</h3>
-                        <p id="resultSummary" class="text-xs text-slate-500">27 Chunks enriched with nodes and edges</p>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Output Root Directory (replicates same directory structure)</label>
+                        <input id="outputRoot" type="text" placeholder="e.g. C:\data\fda_guidance_processed" class="w-full text-sm font-mono border rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-400 outline-none">
                     </div>
                 </div>
-                <a id="downloadBtn" href="#" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm flex items-center gap-2 text-sm transition-all">
-                    <i class="fa-solid fa-download"></i>
-                    Download Enriched JSON
-                </a>
+
+                <div class="flex items-center justify-between border-t pt-4 border-slate-100">
+                    <label class="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
+                        <input id="overwriteExisting" type="checkbox" class="accent-indigo-600 w-4 h-4 rounded">
+                        <span>Overwrite existing output files (default skips already processed files)</span>
+                    </label>
+
+                    <div class="flex gap-2">
+                        <button id="scanBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2 rounded-lg text-sm transition-all flex items-center gap-1.5">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            Scan Files
+                        </button>
+                        <button id="startBatchBtn" disabled class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium px-5 py-2 rounded-lg text-sm transition-all flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-play"></i>
+                            Start Sequential Batch
+                        </button>
+                        <button id="stopBatchBtn" disabled class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-300 font-medium px-4 py-2 rounded-lg text-sm transition-all flex items-center gap-1.5">
+                            <i class="fa-solid fa-stop"></i>
+                            Stop Job
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <!-- Preview of Chunk 0 -->
-            <div>
-                <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Chunk 0 Sample Preview (Nodes & Edges Added)</h4>
-                <div class="bg-slate-900 rounded-lg p-4 overflow-x-auto text-emerald-400 text-xs font-mono max-h-96">
-                    <pre id="jsonPreview">{}</pre>
+            <!-- Batch Progress Live Monitor -->
+            <div id="batchProgressCard" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                            <span id="batchRunningSpinner" class="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-ping"></span>
+                            <span id="batchStatusTitle">Batch Job Running...</span>
+                        </h3>
+                        <p id="batchCurrentFileSubtitle" class="text-xs font-mono text-slate-500 mt-1 truncate max-w-2xl">Processing file: ...</p>
+                    </div>
+                    <div id="batchSummaryStats" class="text-xs font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg">
+                        0 / 0 Completed
+                    </div>
+                </div>
+
+                <!-- Overall File Progress Bar -->
+                <div class="mb-4">
+                    <div class="flex justify-between text-xs text-slate-500 mb-1">
+                        <span>Overall File Queue</span>
+                        <span id="overallPct">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                        <div id="overallBar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Current File Chunk Progress Bar -->
+                <div>
+                    <div class="flex justify-between text-xs text-slate-500 mb-1">
+                        <span>Current File Chunks</span>
+                        <span id="chunkPct">0 / 0 Chunks</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div id="chunkBar" class="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Discovered / Processed Files Table -->
+            <div id="batchTableCard" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-6">
+                <h3 class="font-bold text-slate-800 text-sm mb-3 flex items-center justify-between">
+                    <span>Discovered Files Queue (<span id="fileCountBadge">0</span>)</span>
+                    <span class="text-xs font-normal text-slate-400">Strictly 1 file processed at a time</span>
+                </h3>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-slate-400 uppercase tracking-wider font-semibold">
+                                <th class="py-2.5 px-3">#</th>
+                                <th class="py-2.5 px-3">Relative Path (docling_chunks.json)</th>
+                                <th class="py-2.5 px-3">Chunks</th>
+                                <th class="py-2.5 px-3">Status</th>
+                                <th class="py-2.5 px-3">Extracted Graph</th>
+                                <th class="py-2.5 px-3">Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="batchFilesBody" class="divide-y divide-slate-100 font-mono">
+                            <tr>
+                                <td colspan="6" class="text-center py-6 text-slate-400 font-sans">
+                                    No directory scanned yet. Enter an Input and Output Root above and click "Scan Files".
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: SINGLE FILE UPLOAD MODE (Original mode) -->
+        <div id="singleTabSection" class="hidden">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+                <div id="dropzone" class="border-2 border-dashed border-indigo-200 hover:border-indigo-500 bg-indigo-50/40 rounded-xl p-8 text-center cursor-pointer transition-all">
+                    <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 mb-3"></i>
+                    <h3 class="text-base font-semibold text-slate-700">Drag and drop docling_chunks.json</h3>
+                    <p class="text-xs text-slate-500 mt-1">or click to browse your files</p>
+                    <input type="file" id="fileInput" accept=".json" class="hidden">
+                </div>
+
+                <div id="fileInfo" class="hidden mt-4 p-3 bg-slate-100 rounded-lg flex items-center justify-between text-sm">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-file-code text-indigo-600 text-lg"></i>
+                        <div>
+                            <div id="fileName" class="font-medium text-slate-800">docling_chunks.json</div>
+                            <div id="fileSize" class="text-xs text-slate-500">170 KB</div>
+                        </div>
+                    </div>
+                    <button id="clearFile" class="text-slate-400 hover:text-red-500 text-sm">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="mt-6">
+                    <button id="processBtn" disabled class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 text-sm">
+                        <i class="fa-solid fa-play"></i>
+                        Process & Construct Knowledge Graph
+                    </button>
+                </div>
+            </div>
+
+            <!-- Single File Result Card -->
+            <div id="resultCard" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
+                <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-lg">
+                            <i class="fa-solid fa-check"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-base">Knowledge Graph Generated!</h3>
+                            <p id="resultSummary" class="text-xs text-slate-500">Chunks enriched with nodes and edges</p>
+                        </div>
+                    </div>
+                    <a id="downloadBtn" href="#" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg shadow-sm flex items-center gap-2 text-xs transition-all">
+                        <i class="fa-solid fa-download"></i>
+                        Download Enriched JSON
+                    </a>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Chunk 0 Sample Preview</h4>
+                    <div class="bg-slate-900 rounded-lg p-4 overflow-x-auto text-emerald-400 text-xs font-mono max-h-80">
+                        <pre id="jsonPreview">{}</pre>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        const fileInput = document.getElementById('fileInput');
-        const dropzone = document.getElementById('dropzone');
-        const fileInfo = document.getElementById('fileInfo');
-        const fileName = document.getElementById('fileName');
-        const fileSize = document.getElementById('fileSize');
-        const clearFile = document.getElementById('clearFile');
-        const processBtn = document.getElementById('processBtn');
-        const toggleSettings = document.getElementById('toggleSettings');
-        const settingsPanel = document.getElementById('settingsPanel');
-        const settingsChevron = document.getElementById('settingsChevron');
-        const progressCard = document.getElementById('progressCard');
-        const resultCard = document.getElementById('resultCard');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const jsonPreview = document.getElementById('jsonPreview');
-        const resultSummary = document.getElementById('resultSummary');
-        const serviceStatus = document.getElementById('serviceStatus');
+        // Tab switching
+        const tabBatchBtn = document.getElementById('tabBatchBtn');
+        const tabSingleBtn = document.getElementById('tabSingleBtn');
+        const batchTabSection = document.getElementById('batchTabSection');
+        const singleTabSection = document.getElementById('singleTabSection');
 
-        let selectedFile = null;
+        tabBatchBtn.addEventListener('click', () => {
+            tabBatchBtn.className = 'px-5 py-2.5 font-semibold text-sm border-b-2 border-indigo-600 text-indigo-600 flex items-center gap-2';
+            tabSingleBtn.className = 'px-5 py-2.5 font-medium text-sm text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center gap-2';
+            batchTabSection.classList.remove('hidden');
+            singleTabSection.classList.add('hidden');
+        });
+
+        tabSingleBtn.addEventListener('click', () => {
+            tabSingleBtn.className = 'px-5 py-2.5 font-semibold text-sm border-b-2 border-indigo-600 text-indigo-600 flex items-center gap-2';
+            tabBatchBtn.className = 'px-5 py-2.5 font-medium text-sm text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center gap-2';
+            singleTabSection.classList.remove('hidden');
+            batchTabSection.classList.add('hidden');
+        });
+
+        // Global Settings & Status
+        const serviceStatus = document.getElementById('serviceStatus');
         let defaultsLoaded = false;
 
-        // Check health and load configured defaults from application.properties
         async function checkStatus() {
             try {
                 const res = await fetch('/api/status');
@@ -155,22 +272,21 @@
                     serviceStatus.innerHTML = '<span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Backend & GLiNER Ready';
                 } else {
                     serviceStatus.className = 'flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300';
-                    serviceStatus.innerHTML = '<span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span> GLiNER Python Sidecar Starting...';
+                    serviceStatus.innerHTML = '<span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span> GLiNER Service Starting...';
                 }
 
-                // Populate UI from application.properties on first load
                 if (!defaultsLoaded) {
-                    if (data.default_entity_labels && data.default_entity_labels.length > 0) {
+                    if (data.default_entity_labels) {
                         document.getElementById('entityLabels').value = data.default_entity_labels.join(', ');
                     }
-                    if (data.default_relation_labels && data.default_relation_labels.length > 0) {
+                    if (data.default_relation_labels) {
                         document.getElementById('relationLabels').value = data.default_relation_labels.join(', ');
                     }
-                    if (data.default_threshold !== undefined && data.default_threshold !== null) {
+                    if (data.default_threshold != null) {
                         document.getElementById('threshold').value = data.default_threshold;
                         document.getElementById('threshVal').textContent = parseFloat(data.default_threshold).toFixed(2);
                     }
-                    if (data.default_relation_threshold !== undefined && data.default_relation_threshold !== null) {
+                    if (data.default_relation_threshold != null) {
                         document.getElementById('relThreshold').value = data.default_relation_threshold;
                         document.getElementById('relThreshVal').textContent = parseFloat(data.default_relation_threshold).toFixed(2);
                     }
@@ -184,7 +300,224 @@
         setInterval(checkStatus, 4000);
         checkStatus();
 
-        // Drag & Drop
+        // Settings accordion
+        document.getElementById('toggleSettings').addEventListener('click', () => {
+            document.getElementById('settingsPanel').classList.toggle('hidden');
+            document.getElementById('settingsChevron').classList.toggle('rotate-180');
+        });
+        document.getElementById('threshold').addEventListener('input', (e) => {
+            document.getElementById('threshVal').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+        document.getElementById('relThreshold').addEventListener('input', (e) => {
+            document.getElementById('relThreshVal').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+
+        // -------------------------------------------------------------
+        // BATCH MODE LOGIC
+        // -------------------------------------------------------------
+        const scanBtn = document.getElementById('scanBtn');
+        const startBatchBtn = document.getElementById('startBatchBtn');
+        const stopBatchBtn = document.getElementById('stopBatchBtn');
+        const inputRoot = document.getElementById('inputRoot');
+        const outputRoot = document.getElementById('outputRoot');
+        const overwriteExisting = document.getElementById('overwriteExisting');
+        const batchFilesBody = document.getElementById('batchFilesBody');
+        const fileCountBadge = document.getElementById('fileCountBadge');
+        const batchProgressCard = document.getElementById('batchProgressCard');
+
+        let scannedFiles = [];
+        let pollingInterval = null;
+
+        scanBtn.addEventListener('click', async () => {
+            const inDir = inputRoot.value.trim();
+            const outDir = outputRoot.value.trim();
+            if (!inDir || !outDir) {
+                alert('Please enter both Input Root and Output Root directories.');
+                return;
+            }
+
+            scanBtn.disabled = true;
+            scanBtn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Scanning...';
+
+            try {
+                const res = await fetch('/api/batch/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ inputRoot: inDir, outputRoot: outDir })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to scan directory');
+
+                scannedFiles = data.files || [];
+                fileCountBadge.textContent = scannedFiles.length;
+                renderBatchTable(scannedFiles);
+                startBatchBtn.disabled = scannedFiles.length === 0;
+            } catch (err) {
+                alert('Scan Error: ' + err.message);
+            } finally {
+                scanBtn.disabled = false;
+                scanBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Scan Files';
+            }
+        });
+
+        function renderBatchTable(files) {
+            if (!files || files.length === 0) {
+                batchFilesBody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-slate-400 font-sans">No matching docling_chunks.json found in input directory.</td></tr>';
+                return;
+            }
+
+            batchFilesBody.innerHTML = files.map((f, i) => {
+                let badgeClass = 'bg-slate-100 text-slate-600';
+                if (f.status === 'PROCESSING') badgeClass = 'bg-indigo-100 text-indigo-700 animate-pulse';
+                else if (f.status === 'COMPLETED') badgeClass = 'bg-emerald-100 text-emerald-700';
+                else if (f.status === 'SKIPPED') badgeClass = 'bg-amber-100 text-amber-700';
+                else if (f.status === 'FAILED') badgeClass = 'bg-rose-100 text-rose-700';
+
+                const graphInfo = f.extractedNodes != null && f.extractedNodes > 0
+                    ? `${f.extractedNodes} nodes, ${f.extractedEdges} edges`
+                    : '-';
+
+                const durationStr = f.durationMs ? `${(f.durationMs / 1000).toFixed(1)}s` : '-';
+                const chunksStr = f.totalChunks ? `${f.processedChunks || 0} / ${f.totalChunks}` : '-';
+
+                return `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="py-2 px-3 text-slate-400 font-sans">${i + 1}</td>
+                        <td class="py-2 px-3 text-slate-800 font-medium truncate max-w-md" title="${f.inputFullPath}">${f.relativePath}</td>
+                        <td class="py-2 px-3 text-slate-500">${chunksStr}</td>
+                        <td class="py-2 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${badgeClass}">
+                                ${f.status}
+                            </span>
+                        </td>
+                        <td class="py-2 px-3 text-slate-600">${graphInfo}</td>
+                        <td class="py-2 px-3 text-slate-500">${durationStr}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        startBatchBtn.addEventListener('click', async () => {
+            const inDir = inputRoot.value.trim();
+            const outDir = outputRoot.value.trim();
+            if (!inDir || !outDir) return;
+
+            const entities = document.getElementById('entityLabels').value.split(',').map(s => s.trim()).filter(Boolean);
+            const relations = document.getElementById('relationLabels').value.split(',').map(s => s.trim()).filter(Boolean);
+
+            const payload = {
+                inputRoot: inDir,
+                outputRoot: outDir,
+                overwriteExisting: overwriteExisting.checked,
+                entityLabels: entities,
+                relationLabels: relations,
+                threshold: parseFloat(document.getElementById('threshold').value),
+                relationThreshold: parseFloat(document.getElementById('relThreshold').value)
+            };
+
+            try {
+                startBatchBtn.disabled = true;
+                scanBtn.disabled = true;
+                stopBatchBtn.disabled = false;
+                batchProgressCard.classList.remove('hidden');
+
+                const res = await fetch('/api/batch/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to start batch');
+
+                startPollingBatch();
+            } catch (err) {
+                alert('Start Error: ' + err.message);
+                startBatchBtn.disabled = false;
+                scanBtn.disabled = false;
+                stopBatchBtn.disabled = true;
+            }
+        });
+
+        stopBatchBtn.addEventListener('click', async () => {
+            stopBatchBtn.disabled = true;
+            stopBatchBtn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Stopping...';
+            try {
+                await fetch('/api/batch/stop', { method: 'POST' });
+            } catch (e) {}
+        });
+
+        function startPollingBatch() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/batch/status');
+                    const status = await res.json();
+
+                    if (!status) return;
+
+                    // Update UI counters
+                    const completed = status.completedFiles || 0;
+                    const skipped = status.skippedFiles || 0;
+                    const failed = status.failedFiles || 0;
+                    const total = status.totalFiles || 0;
+                    const doneFiles = completed + skipped + failed;
+
+                    const overallPctVal = total > 0 ? Math.round((doneFiles / total) * 100) : 0;
+                    document.getElementById('overallBar').style.width = overallPctVal + '%';
+                    document.getElementById('overallPct').textContent = `${doneFiles} / ${total} (${overallPctVal}%)`;
+                    document.getElementById('batchSummaryStats').textContent = `${completed} Completed, ${skipped} Skipped, ${failed} Failed`;
+
+                    if (status.currentFileRelativePath) {
+                        document.getElementById('batchCurrentFileSubtitle').textContent = `[${status.currentFileIndex}/${total}] Processing: ${status.currentFileRelativePath}`;
+                    }
+
+                    // Update chunk progress
+                    const curChunks = status.currentFileProcessedChunks || 0;
+                    const totalChunks = status.currentFileTotalChunks || 0;
+                    const chunkPctVal = totalChunks > 0 ? Math.round((curChunks / totalChunks) * 100) : 0;
+                    document.getElementById('chunkBar').style.width = chunkPctVal + '%';
+                    document.getElementById('chunkPct').textContent = `${curChunks} / ${totalChunks} Chunks (${chunkPctVal}%)`;
+
+                    // Update files table
+                    if (status.files && status.files.length > 0) {
+                        renderBatchTable(status.files);
+                    }
+
+                    // Check if job completed
+                    if (!status.running) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        startBatchBtn.disabled = false;
+                        scanBtn.disabled = false;
+                        stopBatchBtn.disabled = true;
+                        stopBatchBtn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Job';
+                        document.getElementById('batchStatusTitle').textContent = 'Batch Job Completed';
+                        document.getElementById('batchRunningSpinner').classList.remove('animate-ping', 'bg-indigo-600');
+                        document.getElementById('batchRunningSpinner').classList.add('bg-emerald-500');
+                    }
+                } catch (e) {
+                    console.error('Polling error', e);
+                }
+            }, 1000);
+        }
+
+        // -------------------------------------------------------------
+        // SINGLE FILE MODE LOGIC
+        // -------------------------------------------------------------
+        const fileInput = document.getElementById('fileInput');
+        const dropzone = document.getElementById('dropzone');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const clearFile = document.getElementById('clearFile');
+        const processBtn = document.getElementById('processBtn');
+        const resultCard = document.getElementById('resultCard');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const jsonPreview = document.getElementById('jsonPreview');
+        const resultSummary = document.getElementById('resultSummary');
+
+        let selectedFile = null;
+
         dropzone.addEventListener('click', () => fileInput.click());
         dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('border-indigo-600', 'bg-indigo-100/50'); });
         dropzone.addEventListener('dragleave', () => { dropzone.classList.remove('border-indigo-600', 'bg-indigo-100/50'); });
@@ -193,7 +526,6 @@
             dropzone.classList.remove('border-indigo-600', 'bg-indigo-100/50');
             if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
         });
-
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) handleFile(e.target.files[0]);
         });
@@ -217,64 +549,43 @@
             processBtn.disabled = true;
         });
 
-        // Settings toggle
-        toggleSettings.addEventListener('click', () => {
-            settingsPanel.classList.toggle('hidden');
-            settingsChevron.classList.toggle('rotate-180');
-        });
-
-        document.getElementById('threshold').addEventListener('input', (e) => {
-            document.getElementById('threshVal').textContent = parseFloat(e.target.value).toFixed(2);
-        });
-        document.getElementById('relThreshold').addEventListener('input', (e) => {
-            document.getElementById('relThreshVal').textContent = parseFloat(e.target.value).toFixed(2);
-        });
-
-        // Process file
         processBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
 
             processBtn.disabled = true;
-            progressCard.classList.remove('hidden');
+            processBtn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Processing...';
             resultCard.classList.add('hidden');
 
             const formData = new FormData();
             formData.append('file', selectedFile);
-            
+
             const entities = document.getElementById('entityLabels').value.split(',').map(s => s.trim()).filter(Boolean);
             const relations = document.getElementById('relationLabels').value.split(',').map(s => s.trim()).filter(Boolean);
-            
+
             entities.forEach(ent => formData.append('entityLabels', ent));
             relations.forEach(rel => formData.append('relationLabels', rel));
             formData.append('threshold', document.getElementById('threshold').value);
             formData.append('relationThreshold', document.getElementById('relThreshold').value);
 
             try {
-                const res = await fetch('/api/process', {
-                    method: 'POST',
-                    body: formData
-                });
-
+                const res = await fetch('/api/process', { method: 'POST', body: formData });
                 if (!res.ok) {
                     const err = await res.json();
                     throw new Error(err.error || 'Processing error');
                 }
 
                 const data = await res.json();
-                progressCard.classList.add('hidden');
                 resultCard.classList.remove('hidden');
-
                 resultSummary.textContent = `${data.totalChunks} chunks successfully enriched with nodes and edges.`;
                 downloadBtn.href = `/api/download/${data.fileId}?name=${encodeURIComponent(data.fileName)}`;
                 jsonPreview.textContent = JSON.stringify(data.preview, null, 2);
             } catch (err) {
-                progressCard.classList.add('hidden');
                 alert('Processing Error: ' + err.message);
             } finally {
                 processBtn.disabled = false;
+                processBtn.innerHTML = '<i class="fa-solid fa-play"></i> Process & Construct Knowledge Graph';
             }
         });
     </script>
 </body>
 </html>
-
