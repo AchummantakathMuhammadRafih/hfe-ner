@@ -5,14 +5,24 @@ from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 import uvicorn
+import torch
 from gliner import GLiNER
 
 app = FastAPI(title="GLiNER Knowledge Graph Service", version="1.0.0")
 
+# Auto-detect GPU / CUDA device
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL_NAME = os.getenv("GLINER_MODEL", "knowledgator/gliner-relex-large-v1.0")
+
+print("=" * 60)
+print(f"Target Device: {DEVICE.upper()}")
+if DEVICE == "cuda":
+    print(f"GPU Model: {torch.cuda.get_device_name(0)}")
+    print(f"VRAM Available: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
 print(f"Loading GLiNER Relex model: {MODEL_NAME} ...")
-model = GLiNER.from_pretrained(MODEL_NAME)
-print("Model loaded successfully.")
+model = GLiNER.from_pretrained(MODEL_NAME).to(DEVICE)
+print(f"Model successfully loaded and moved to {DEVICE.upper()}!")
+print("=" * 60)
 
 # Sliding window parameters
 MAX_WINDOW_WORDS = 320   # Word limit per sub-window (well within 384)
@@ -169,8 +179,16 @@ def extract_graph(req: GraphChunkRequest):
 
 @app.get("/health")
 def health():
-    return {"status": "UP", "model": MODEL_NAME}
+    return {
+        "status": "UP",
+        "model": MODEL_NAME,
+        "device": DEVICE,
+        "cuda_available": torch.cuda.is_available(),
+        "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+    }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    # Host on 0.0.0.0 so remote machines / Spring Boot can connect
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
