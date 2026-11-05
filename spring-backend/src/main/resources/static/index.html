@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docling Knowledge Graph Construction with GLiNER</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+    <div class="max-w-5xl mx-auto py-10 px-4">
+        <!-- Header -->
+        <header class="mb-8 flex items-center justify-between border-b pb-6 border-slate-200">
+            <div>
+                <h1 class="text-3xl font-bold text-indigo-900 flex items-center gap-3">
+                    <i class="fa-solid fa-diagram-project text-indigo-600"></i>
+                    Docling KG Builder with GLiNER
+                </h1>
+                <p class="text-sm text-slate-600 mt-1">
+                    Joint Zero-Shot Entity & Relation Extraction using <span class="font-mono bg-slate-200 px-1.5 py-0.5 rounded text-xs text-indigo-800">knowledgator/gliner-relex-large-v1.0</span>
+                </p>
+            </div>
+            <div id="serviceStatus" class="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                Checking services...
+            </div>
+        </header>
+
+        <!-- Main Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
+            <!-- Dropzone -->
+            <div id="dropzone" class="border-2 border-dashed border-indigo-200 hover:border-indigo-500 bg-indigo-50/40 rounded-xl p-8 text-center cursor-pointer transition-all">
+                <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 mb-3"></i>
+                <h3 class="text-base font-semibold text-slate-700">Drag and drop docling_chunks.json</h3>
+                <p class="text-xs text-slate-500 mt-1">or click to browse your files</p>
+                <input type="file" id="fileInput" accept=".json" class="hidden">
+            </div>
+
+            <!-- Selected File Badge -->
+            <div id="fileInfo" class="hidden mt-4 p-3 bg-slate-100 rounded-lg flex items-center justify-between text-sm">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-file-code text-indigo-600 text-lg"></i>
+                    <div>
+                        <div id="fileName" class="font-medium text-slate-800">docling_chunks.json</div>
+                        <div id="fileSize" class="text-xs text-slate-500">170 KB</div>
+                    </div>
+                </div>
+                <button id="clearFile" class="text-slate-400 hover:text-red-500 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Settings Accordion -->
+            <div class="mt-6 border-t pt-4 border-slate-100">
+                <button id="toggleSettings" class="text-xs font-semibold text-slate-600 flex items-center gap-2 hover:text-indigo-600">
+                    <i class="fa-solid fa-sliders"></i>
+                    Advanced Extraction Schema & Thresholds
+                    <i id="settingsChevron" class="fa-solid fa-chevron-down text-[10px] transition-transform"></i>
+                </button>
+
+                <div id="settingsPanel" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Entity Labels (Comma-separated)</label>
+                        <textarea id="entityLabels" rows="3" class="w-full text-xs font-mono border rounded-lg p-2 focus:ring-2 focus:ring-indigo-400 outline-none">USE_ENVIRONMENT, USER, DEVICE, HAZARD, TASK, HFE_STUDY, CLINICAL_CONSIDERATION, REGULATION, ORGANIZATION</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Relation Labels (Comma-separated)</label>
+                        <textarea id="relationLabels" rows="3" class="w-full text-xs font-mono border rounded-lg p-2 focus:ring-2 focus:ring-indigo-400 outline-none">CAUSED_BY, USED_IN, PERFORMED_BY, ASSOCIATED_WITH, APPLIED_TO, REQUIRES, REGULATED_BY</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Entity Threshold: <span id="threshVal">0.40</span></label>
+                        <input id="threshold" type="range" min="0.1" max="0.9" step="0.05" value="0.4" class="w-full accent-indigo-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Relation Threshold: <span id="relThreshVal">0.40</span></label>
+                        <input id="relThreshold" type="range" min="0.1" max="0.9" step="0.05" value="0.4" class="w-full accent-indigo-600">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="mt-6">
+                <button id="processBtn" disabled class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg shadow-sm transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-play"></i>
+                    Process & Construct Knowledge Graph
+                </button>
+            </div>
+        </div>
+
+        <!-- Progress Card -->
+        <div id="progressCard" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8 text-center">
+            <div class="inline-block animate-spin text-indigo-600 text-3xl mb-3">
+                <i class="fa-solid fa-circle-notch"></i>
+            </div>
+            <h3 class="text-base font-semibold text-slate-800">Extracting Knowledge Graph Entities & Relations...</h3>
+            <p class="text-xs text-slate-500 mt-1">Evaluating 1024-token chunks with sliding windows and normalizing edge weights (1.0 to 5.0)</p>
+        </div>
+
+        <!-- Results & Download Card -->
+        <div id="resultCard" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-lg">Knowledge Graph Generated!</h3>
+                        <p id="resultSummary" class="text-xs text-slate-500">27 Chunks enriched with nodes and edges</p>
+                    </div>
+                </div>
+                <a id="downloadBtn" href="#" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm flex items-center gap-2 text-sm transition-all">
+                    <i class="fa-solid fa-download"></i>
+                    Download Enriched JSON
+                </a>
+            </div>
+
+            <!-- Preview of Chunk 0 -->
+            <div>
+                <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Chunk 0 Sample Preview (Nodes & Edges Added)</h4>
+                <div class="bg-slate-900 rounded-lg p-4 overflow-x-auto text-emerald-400 text-xs font-mono max-h-96">
+                    <pre id="jsonPreview">{}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const dropzone = document.getElementById('dropzone');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const clearFile = document.getElementById('clearFile');
+        const processBtn = document.getElementById('processBtn');
+        const toggleSettings = document.getElementById('toggleSettings');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const settingsChevron = document.getElementById('settingsChevron');
+        const progressCard = document.getElementById('progressCard');
+        const resultCard = document.getElementById('resultCard');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const jsonPreview = document.getElementById('jsonPreview');
+        const resultSummary = document.getElementById('resultSummary');
+        const serviceStatus = document.getElementById('serviceStatus');
+
+        let selectedFile = null;
+        let defaultsLoaded = false;
+
+        // Check health and load configured defaults from application.properties
+        async function checkStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                if (data.gliner_python_service === 'UP') {
+                    serviceStatus.className = 'flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300';
+                    serviceStatus.innerHTML = '<span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Backend & GLiNER Ready';
+                } else {
+                    serviceStatus.className = 'flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300';
+                    serviceStatus.innerHTML = '<span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span> GLiNER Python Sidecar Starting...';
+                }
+
+                // Populate UI from application.properties on first load
+                if (!defaultsLoaded) {
+                    if (data.default_entity_labels && data.default_entity_labels.length > 0) {
+                        document.getElementById('entityLabels').value = data.default_entity_labels.join(', ');
+                    }
+                    if (data.default_relation_labels && data.default_relation_labels.length > 0) {
+                        document.getElementById('relationLabels').value = data.default_relation_labels.join(', ');
+                    }
+                    if (data.default_threshold !== undefined && data.default_threshold !== null) {
+                        document.getElementById('threshold').value = data.default_threshold;
+                        document.getElementById('threshVal').textContent = parseFloat(data.default_threshold).toFixed(2);
+                    }
+                    if (data.default_relation_threshold !== undefined && data.default_relation_threshold !== null) {
+                        document.getElementById('relThreshold').value = data.default_relation_threshold;
+                        document.getElementById('relThreshVal').textContent = parseFloat(data.default_relation_threshold).toFixed(2);
+                    }
+                    defaultsLoaded = true;
+                }
+            } catch (e) {
+                serviceStatus.className = 'flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300';
+                serviceStatus.innerHTML = '<span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Spring Boot Offline';
+            }
+        }
+        setInterval(checkStatus, 4000);
+        checkStatus();
+
+        // Drag & Drop
+        dropzone.addEventListener('click', () => fileInput.click());
+        dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('border-indigo-600', 'bg-indigo-100/50'); });
+        dropzone.addEventListener('dragleave', () => { dropzone.classList.remove('border-indigo-600', 'bg-indigo-100/50'); });
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('border-indigo-600', 'bg-indigo-100/50');
+            if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file.name.endsWith('.json')) {
+                alert('Please upload a valid .json file (e.g. docling_chunks.json)');
+                return;
+            }
+            selectedFile = file;
+            fileName.textContent = file.name;
+            fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+            fileInfo.classList.remove('hidden');
+            processBtn.disabled = false;
+        }
+
+        clearFile.addEventListener('click', () => {
+            selectedFile = null;
+            fileInput.value = '';
+            fileInfo.classList.add('hidden');
+            processBtn.disabled = true;
+        });
+
+        // Settings toggle
+        toggleSettings.addEventListener('click', () => {
+            settingsPanel.classList.toggle('hidden');
+            settingsChevron.classList.toggle('rotate-180');
+        });
+
+        document.getElementById('threshold').addEventListener('input', (e) => {
+            document.getElementById('threshVal').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+        document.getElementById('relThreshold').addEventListener('input', (e) => {
+            document.getElementById('relThreshVal').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+
+        // Process file
+        processBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            processBtn.disabled = true;
+            progressCard.classList.remove('hidden');
+            resultCard.classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            const entities = document.getElementById('entityLabels').value.split(',').map(s => s.trim()).filter(Boolean);
+            const relations = document.getElementById('relationLabels').value.split(',').map(s => s.trim()).filter(Boolean);
+            
+            entities.forEach(ent => formData.append('entityLabels', ent));
+            relations.forEach(rel => formData.append('relationLabels', rel));
+            formData.append('threshold', document.getElementById('threshold').value);
+            formData.append('relationThreshold', document.getElementById('relThreshold').value);
+
+            try {
+                const res = await fetch('/api/process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Processing error');
+                }
+
+                const data = await res.json();
+                progressCard.classList.add('hidden');
+                resultCard.classList.remove('hidden');
+
+                resultSummary.textContent = `${data.totalChunks} chunks successfully enriched with nodes and edges.`;
+                downloadBtn.href = `/api/download/${data.fileId}?name=${encodeURIComponent(data.fileName)}`;
+                jsonPreview.textContent = JSON.stringify(data.preview, null, 2);
+            } catch (err) {
+                progressCard.classList.add('hidden');
+                alert('Processing Error: ' + err.message);
+            } finally {
+                processBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
+
