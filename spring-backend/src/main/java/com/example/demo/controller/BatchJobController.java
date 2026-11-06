@@ -81,8 +81,8 @@ public class BatchJobController {
     }
 
     @PostMapping("/file/{id}/run")
-    public ResponseEntity<?> runSingleFile(@PathVariable Long id) {
-        boolean queued = queueService.processSingleFileById(id);
+    public ResponseEntity<?> runSingleFile(@PathVariable Long id, @RequestBody(required = false) BatchJobRequest req) {
+        boolean queued = queueService.processSingleFileById(id, req);
         if (queued) {
             return ResponseEntity.ok(Map.of("message", "File #" + id + " dispatched to worker."));
         } else {

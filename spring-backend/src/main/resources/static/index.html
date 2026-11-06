@@ -524,10 +524,30 @@
             }).join('');
         }
 
+        function getSettingsPayload() {
+            const entities = document.getElementById('entityLabels').value.split(',').map(s => s.trim()).filter(Boolean);
+            const relations = document.getElementById('relationLabels').value.split(',').map(s => s.trim()).filter(Boolean);
+            return {
+                inputRoot: inputRoot.value.trim(),
+                outputRoot: outputRoot.value.trim(),
+                overwriteExisting: overwriteExisting.checked,
+                concurrency: parseInt(concurrencyInput.value) || 10,
+                entityLabels: entities,
+                relationLabels: relations,
+                threshold: parseFloat(document.getElementById('threshold').value),
+                relationThreshold: parseFloat(document.getElementById('relThreshold').value)
+            };
+        }
+
         // Row individual button handlers
         async function runFile(id) {
             try {
-                const res = await fetch(`/api/batch/file/${id}/run`, { method: 'POST' });
+                const payload = getSettingsPayload();
+                const res = await fetch(`/api/batch/file/${id}/run`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
                 const data = await res.json();
                 if (!res.ok) alert(data.error);
                 await refreshTable();
@@ -559,20 +579,12 @@
         startBatchBtn.addEventListener('click', async () => {
             const inDir = inputRoot.value.trim();
             const outDir = outputRoot.value.trim();
+            if (!inDir || !outDir) {
+                alert('Please enter both Input Root and Output Root directories.');
+                return;
+            }
 
-            const entities = document.getElementById('entityLabels').value.split(',').map(s => s.trim()).filter(Boolean);
-            const relations = document.getElementById('relationLabels').value.split(',').map(s => s.trim()).filter(Boolean);
-
-            const payload = {
-                inputRoot: inDir,
-                outputRoot: outDir,
-                overwriteExisting: overwriteExisting.checked,
-                concurrency: parseInt(concurrencyInput.value) || 10,
-                entityLabels: entities,
-                relationLabels: relations,
-                threshold: parseFloat(document.getElementById('threshold').value),
-                relationThreshold: parseFloat(document.getElementById('relThreshold').value)
-            };
+            const payload = getSettingsPayload();
 
             try {
                 const res = await fetch('/api/batch/start', {

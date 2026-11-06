@@ -105,15 +105,21 @@ public class PersistentBatchQueueService {
         return Map.of("totalFound", scannedItems.size(), "newAdded", added, "alreadyInDb", existing);
     }
 
-    public synchronized void startQueue(BatchJobRequest req) {
-        this.configuredConcurrency = (req.getConcurrency() > 0 && req.getConcurrency() <= 50) ? req.getConcurrency() : 10;
+    public synchronized void updateSettings(BatchJobRequest req) {
+        if (req == null) return;
+        if (req.getConcurrency() > 0 && req.getConcurrency() <= 50) this.configuredConcurrency = req.getConcurrency();
         this.configuredOverwrite = req.isOverwriteExisting();
 
         if (req.getEntityLabels() != null && !req.getEntityLabels().isEmpty()) defaultEntityLabels = req.getEntityLabels();
         if (req.getRelationLabels() != null && !req.getRelationLabels().isEmpty()) defaultRelationLabels = req.getRelationLabels();
         if (req.getThreshold() != null) defaultThreshold = req.getThreshold();
         if (req.getRelationThreshold() != null) defaultRelationThreshold = req.getRelationThreshold();
+        log.info("Updated batch settings: threshold={}, relThreshold={}, overwrite={}, concurrency={}",
+                defaultThreshold, defaultRelationThreshold, configuredOverwrite, configuredConcurrency);
+    }
 
+    public synchronized void startQueue(BatchJobRequest req) {
+        updateSettings(req);
         stopRequested.set(false);
 
         if (!isQueueRunning.get()) {
@@ -129,7 +135,10 @@ public class PersistentBatchQueueService {
         isQueueRunning.set(false);
     }
 
-    public boolean processSingleFileById(Long id) {
+    public boolean processSingleFileById(Long id, BatchJobRequest req) {
+        if (req != null) {
+            updateSettings(req);
+        }
         Optional<BatchFileEntity> opt = repository.findById(id);
         if (opt.isEmpty()) return false;
 
