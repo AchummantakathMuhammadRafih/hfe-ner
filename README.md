@@ -37,13 +37,64 @@ Spring Boot (Java 21) & GLiNER application that ingests `docling_chunks.json`, c
 
 ## 2. Quick Start
 
+### GPU Acceleration Setup (Local CUDA or Remote Instance)
+
+For maximum throughput during batch processing, run GLiNER on an NVIDIA GPU (CUDA 11.8 or CUDA 12.x).
+
+#### 1. Requirements & CUDA PyTorch Installation
+Ensure PyTorch is installed with CUDA support (standard `pip install torch` often defaults to CPU on some systems):
+
+```bash
+# For CUDA 12.1 / 12.4:
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# For CUDA 11.8:
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# Install GLiNER dependencies with relation extraction support:
+pip install -U gliner fastapi uvicorn pydantic
+```
+
+#### 2. Verify GPU Acceleration
+Run:
+```bash
+python -c "import torch; print('CUDA Available:', torch.cuda.is_available()); print('Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+```
+
+#### 3. Automatic VRAM Memory Management
+`gliner_service.py` is pre-configured with:
+- `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` to avoid VRAM memory fragmentation.
+- Sliding-window batch inference under `torch.no_grad()` to eliminate autograd graph overhead.
+- `torch.cuda.empty_cache()` after each chunk to keep memory footprint minimal.
+
+---
+
+### Running with Remote GPU (e.g., vast.ai, RunPod, AWS EC2)
+
+If hosting the GLiNER model on a remote GPU instance:
+
+1. **On the Remote Machine**:
+   ```bash
+   pip install -U gliner fastapi uvicorn torch
+   python gliner_service.py --host 0.0.0.0 --port 8000
+   ```
+
+2. **On your Local Machine (SSH Port Forwarding)**:
+   Create a secure local tunnel mapping port `8000`:
+   ```bash
+   ssh -i <your_key> -p <port> root@<remote_host> -L 8000:localhost:8000
+   ```
+   Now Spring Boot connects seamlessly to `http://127.0.0.1:8000` as if it were running locally with full remote GPU acceleration.
+
+---
+
 ### One-Click Startup (Windows)
 Double-click or run:
 ```cmd
 start_app.bat
 ```
 This starts:
-1. The GLiNER Python inference service on `http://127.0.0.1:8000`.
+1. The GLiNER Python inference service on `http://127.0.0.1:8000` (auto-detects CUDA GPU).
 2. The Spring Boot backend & web UI on `http://localhost:8080`.
 
 ---
