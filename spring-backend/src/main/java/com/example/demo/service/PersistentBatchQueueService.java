@@ -40,8 +40,11 @@ public class PersistentBatchQueueService {
     @Value("${gliner.default.threshold:0.4}")
     private Double defaultThreshold;
 
-    @Value("${gliner.default.relation-threshold:0.4}")
+    @Value("${gliner.default.relation-threshold:0.28}")
     private Double defaultRelationThreshold;
+
+    @Value("${gliner.chunk.batch-size:8}")
+    private int chunkBatchSize;
 
     // Worker pool for up to 10 files at a time
     private ExecutorService workerPool = Executors.newFixedThreadPool(10);
@@ -269,54 +272,68 @@ public class PersistentBatchQueueService {
             int totalNodes = 0;
             int totalEdges = 0;
 
-            for (int c = 0; c < totalChunks; c++) {
+            int effectiveBatchSize = chunkBatchSize > 0 ? chunkBatchSize : 8;
+
+            for (int i = 0; i < totalChunks; i += effectiveBatchSize) {
                 if (stopRequested.get() && isQueueRunning.get()) {
                     entity.setStatus("PENDING");
                     repository.save(entity);
                     return;
                 }
 
-                JsonNode chunkItem = chunksArray.get(c);
-                if (!chunkItem.isObject()) continue;
+                int batchEnd = Math.min(i + effectiveBatchSize, totalChunks);
+                List<com.example.demo.model.BatchGlinerRequest.SingleChunkItem> batchItems = new ArrayList<>();
+                List<ObjectNode> batchChunkNodes = new ArrayList<>();
 
-                ObjectNode chunkObj = (ObjectNode) chunkItem;
-                int chunkIndex = chunkObj.has("chunk_index") ? chunkObj.get("chunk_index").asInt() : c;
-                String text = chunkObj.has("raw_text") && !chunkObj.get("raw_text").asText().isBlank()
-                        ? chunkObj.get("raw_text").asText()
-                        : (chunkObj.has("text") ? chunkObj.get("text").asText() : "");
+                for (int c = i; c < batchEnd; c++) {
+                    JsonNode chunkItem = chunksArray.get(c);
+                    if (!chunkItem.isObject()) continue;
 
-                // Call GLiNER remote inference
-                GlinerChunkResponse kgRes;
+                    ObjectNode chunkObj = (ObjectNode) chunkItem;
+                    int chunkIndex = chunkObj.has("chunk_index") ? chunkObj.get("chunk_index").asInt() : c;
+                    String text = chunkObj.has("raw_text") && !chunkObj.get("raw_text").asText().isBlank()
+                            ? chunkObj.get("raw_text").asText()
+                            : (chunkObj.has("text") ? chunkObj.get("text").asText() : "");
+
+                    batchItems.add(new com.example.demo.model.BatchGlinerRequest.SingleChunkItem(chunkIndex, text));
+                    batchChunkNodes.add(chunkObj);
+                }
+
+                if (batchItems.isEmpty()) continue;
+
+                // Send bulk request across SSH / HTTP to GPU
+                List<GlinerChunkResponse> batchResponses;
                 try {
-                    kgRes = glinerClient.extract(
-                            chunkIndex,
-                            text,
+                    batchResponses = glinerClient.extractBatch(
+                            batchItems,
                             defaultEntityLabels,
                             defaultRelationLabels,
                             defaultThreshold,
                             defaultRelationThreshold
                     );
-                    if (kgRes == null) {
-                        throw new RuntimeException("GLiNER service returned null for chunk #" + chunkIndex);
+                    if (batchResponses == null || batchResponses.size() != batchItems.size()) {
+                        throw new RuntimeException("Expected " + batchItems.size() + " batch responses, but received "
+                                + (batchResponses != null ? batchResponses.size() : 0));
                     }
                 } catch (Exception ex) {
-                    // STRICT FAILURE: If any chunk fails, fail the entire file immediately!
-                    throw new RuntimeException("Failed at chunk #" + chunkIndex + ": " + ex.getMessage(), ex);
+                    throw new RuntimeException("Failed at chunk batch [" + i + " - " + (batchEnd - 1) + "]: " + ex.getMessage(), ex);
                 }
 
-                int nodesCount = kgRes.getNodes() != null ? kgRes.getNodes().size() : 0;
-                int edgesCount = kgRes.getEdges() != null ? kgRes.getEdges().size() : 0;
-                totalNodes += nodesCount;
-                totalEdges += edgesCount;
+                for (int b = 0; b < batchResponses.size(); b++) {
+                    GlinerChunkResponse kgRes = batchResponses.get(b);
+                    ObjectNode chunkObj = batchChunkNodes.get(b);
 
-                chunkObj.set("nodes", objectMapper.valueToTree(kgRes.getNodes()));
-                chunkObj.set("edges", objectMapper.valueToTree(kgRes.getEdges()));
+                    int nodesCount = kgRes.getNodes() != null ? kgRes.getNodes().size() : 0;
+                    int edgesCount = kgRes.getEdges() != null ? kgRes.getEdges().size() : 0;
+                    totalNodes += nodesCount;
+                    totalEdges += edgesCount;
 
-                entity.setProcessedChunks(c + 1);
-                // Save progress checkpoint periodically (every 5 chunks or last)
-                if ((c + 1) % 5 == 0 || (c + 1) == totalChunks) {
-                    repository.save(entity);
+                    chunkObj.set("nodes", objectMapper.valueToTree(kgRes.getNodes()));
+                    chunkObj.set("edges", objectMapper.valueToTree(kgRes.getEdges()));
                 }
+
+                entity.setProcessedChunks(batchEnd);
+                repository.save(entity);
             }
 
             // Write to .tmp then rename atomically

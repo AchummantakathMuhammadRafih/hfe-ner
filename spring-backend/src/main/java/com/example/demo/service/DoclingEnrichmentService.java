@@ -56,33 +56,47 @@ public class DoclingEnrichmentService {
         int totalNodesExtracted = 0;
         int totalEdgesExtracted = 0;
 
-        for (int i = 0; i < totalChunks; i++) {
-            JsonNode chunkItem = chunksArray.get(i);
-            if (!chunkItem.isObject()) continue;
+        int batchSize = 8;
 
-            ObjectNode chunkObj = (ObjectNode) chunkItem;
-            int chunkIndex = chunkObj.has("chunk_index") ? chunkObj.get("chunk_index").asInt() : i;
-            String text = chunkObj.has("raw_text") && !chunkObj.get("raw_text").asText().isBlank()
-                    ? chunkObj.get("raw_text").asText()
-                    : (chunkObj.has("text") ? chunkObj.get("text").asText() : "");
+        for (int i = 0; i < totalChunks; i += batchSize) {
+            int batchEnd = Math.min(i + batchSize, totalChunks);
+            List<com.example.demo.model.BatchGlinerRequest.SingleChunkItem> batchItems = new java.util.ArrayList<>();
+            List<ObjectNode> batchChunkNodes = new java.util.ArrayList<>();
 
-            int wordCount = text.isBlank() ? 0 : text.split("\\s+").length;
-            int currentStep = i + 1;
-            double pct = ((double) currentStep / totalChunks) * 100.0;
-            log.info(">>> [{}/{} ({:.1f}%)] Processing chunk #{} (approx {} words)...", currentStep, totalChunks, pct, chunkIndex, wordCount);
+            for (int c = i; c < batchEnd; c++) {
+                JsonNode chunkItem = chunksArray.get(c);
+                if (!chunkItem.isObject()) continue;
 
-            long chunkStart = System.currentTimeMillis();
+                ObjectNode chunkObj = (ObjectNode) chunkItem;
+                int chunkIndex = chunkObj.has("chunk_index") ? chunkObj.get("chunk_index").asInt() : c;
+                String text = chunkObj.has("raw_text") && !chunkObj.get("raw_text").asText().isBlank()
+                        ? chunkObj.get("raw_text").asText()
+                        : (chunkObj.has("text") ? chunkObj.get("text").asText() : "");
+
+                batchItems.add(new com.example.demo.model.BatchGlinerRequest.SingleChunkItem(chunkIndex, text));
+                batchChunkNodes.add(chunkObj);
+            }
+
+            if (batchItems.isEmpty()) continue;
+
+            double pct = ((double) batchEnd / totalChunks) * 100.0;
+            log.info(">>> [{}/{} ({:.1f}%)] Processing chunk batch [{} - {}] ({} chunks)...",
+                    batchEnd, totalChunks, pct, i, batchEnd - 1, batchItems.size());
+
+            long batchStart = System.currentTimeMillis();
             try {
-                GlinerChunkResponse kgRes = glinerClient.extract(
-                        chunkIndex,
-                        text,
+                List<GlinerChunkResponse> batchResponses = glinerClient.extractBatch(
+                        batchItems,
                         entityLabels,
                         relationLabels,
                         threshold,
                         relationThreshold
                 );
 
-                if (kgRes != null) {
+                for (int b = 0; b < batchResponses.size(); b++) {
+                    GlinerChunkResponse kgRes = batchResponses.get(b);
+                    ObjectNode chunkObj = batchChunkNodes.get(b);
+
                     int nodeCount = kgRes.getNodes() != null ? kgRes.getNodes().size() : 0;
                     int edgeCount = kgRes.getEdges() != null ? kgRes.getEdges().size() : 0;
                     totalNodesExtracted += nodeCount;
@@ -90,23 +104,20 @@ public class DoclingEnrichmentService {
 
                     chunkObj.set("nodes", objectMapper.valueToTree(kgRes.getNodes()));
                     chunkObj.set("edges", objectMapper.valueToTree(kgRes.getEdges()));
+                }
 
-                    long chunkElapsed = System.currentTimeMillis() - chunkStart;
-                    log.info("<<< [{}/{} ({:.1f}%)] Completed chunk #{} in {}ms -> Extracted: {} nodes, {} edges",
-                            currentStep, totalChunks, pct, chunkIndex, chunkElapsed, nodeCount, edgeCount);
-                } else {
+                long batchElapsed = System.currentTimeMillis() - batchStart;
+                log.info("<<< [{}/{} ({:.1f}%)] Completed chunk batch in {}ms", batchEnd, totalChunks, pct, batchElapsed);
+            } catch (Exception ex) {
+                log.error("<<< Failed to extract KG for batch [{} - {}]: {}", i, batchEnd - 1, ex.getMessage());
+                for (ObjectNode chunkObj : batchChunkNodes) {
                     chunkObj.putArray("nodes");
                     chunkObj.putArray("edges");
-                    log.warn("<<< Chunk #{} returned empty response from GLiNER", chunkIndex);
                 }
-            } catch (Exception ex) {
-                log.error("<<< Failed to extract KG for chunk #{}: {}", chunkIndex, ex.getMessage());
-                chunkObj.putArray("nodes");
-                chunkObj.putArray("edges");
             }
 
             if (callback != null) {
-                callback.onProgress(i + 1, totalChunks);
+                callback.onProgress(batchEnd, totalChunks);
             }
         }
 
