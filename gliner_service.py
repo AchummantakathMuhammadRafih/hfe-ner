@@ -78,22 +78,50 @@ class GraphChunkResponse(BaseModel):
 class BatchGraphChunkResponse(BaseModel):
     results: List[GraphChunkResponse]
 
+def clean_markdown_artifacts(text: str) -> str:
+    """Collapses runs of markdown table separators and punctuation lines that blow up tokenizers."""
+    # Collapse repetitive hyphen / dash divider lines: e.g. '---------------------' -> '---'
+    text = re.sub(r'-{4,}', '---', text)
+    # Collapse repetitive underscore divider lines: '______' -> '___'
+    text = re.sub(r'_{4,}', '___', text)
+    # Collapse repetitive pipe-dash table sequences: '|---|---|'
+    text = re.sub(r'(\|\s*-{3,}\s*){2,}\|?', '|---|---|', text)
+    # Collapse repetitive spaces
+    text = re.sub(r'[ \t]{3,}', ' ', text)
+    return text
+
 def split_into_windows(text: str, max_words: int = MAX_WINDOW_WORDS, overlap: int = OVERLAP_WORDS) -> List[str]:
-    """Splits a long chunk text into overlapping sub-windows based on words."""
+    """Splits text into overlapping sub-windows using token-aware and word-aware boundaries."""
+    text = clean_markdown_artifacts(text)
     words = text.split()
-    if len(words) <= max_words:
-        return [text]
-    
+    if not words:
+        return []
+
+    # Use GLiNER's token regex: \w+(?:[-_]\w+)*|\S
+    # Ensure no window has > 350 actual tokens (well below model limit of 2048)
     windows = []
-    step = max_words - overlap
+    step = max(1, max_words - overlap)
     start = 0
+
     while start < len(words):
         end = min(start + max_words, len(words))
         sub_window = " ".join(words[start:end])
-        windows.append(sub_window)
+
+        # If a single sub_window still contains excessive tokens due to unspaced characters:
+        tokens = re.findall(r'\w+(?:[-_]\w+)*|\S', sub_window)
+        if len(tokens) > 384:
+            # Sub-slice by actual tokens to guarantee it never exceeds 2048
+            token_step = 250
+            for t_idx in range(0, len(tokens), token_step):
+                chunk_slice = " ".join(tokens[t_idx : t_idx + token_step])
+                windows.append(chunk_slice)
+        else:
+            windows.append(sub_window)
+
         if end == len(words):
             break
         start += step
+
     return windows
 
 def normalize_weight(score: float, min_val: float = 1.0, max_val: float = 5.0) -> float:
